@@ -12,9 +12,15 @@ func (svc *service) RegisterNewUser(username string, password string, email stri
 		return nil, err
 	}
 
-	err = svc.users.Store(user)
+	if u, _ := svc.users.FindByName(username); u != nil {
+		return nil, fmt.Errorf("username in use")
+	}
 
-	if err != nil {
+	if u, _ := svc.users.FindByEmail(email); u != nil {
+		return nil, fmt.Errorf("email in use")
+	}
+
+	if err = svc.users.Store(user); err != nil {
 		return nil, fmt.Errorf("error saving user: %s ", err)
 	}
 

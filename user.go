@@ -8,6 +8,7 @@ import (
 type Repository interface {
 	FindByName(username string) (*user, error)
 	Store(u *user) error
+	FindByEmail(e string) (*user, error)
 }
 
 type user struct {
