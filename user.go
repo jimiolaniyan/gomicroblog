@@ -2,6 +2,8 @@ package gomicroblog
 
 import (
 	"errors"
+	"github.com/rs/xid"
+	"golang.org/x/crypto/bcrypt"
 	"strings"
 )
 
@@ -35,24 +37,39 @@ var (
 	ErrInvalidEmail    = errors.New("invalid email address")
 )
 
-func NewUser(username, password, email string) (*user, error) {
-	if err := validateArgs(username, password, email); err != nil {
+func NewUser(username, email string) (*user, error) {
+	if err := validateArgs(username, email); err != nil {
 		return nil, err
 	}
 
-	return &user{username: username, password: password, email: email}, nil
+	return &user{username: username, email: email}, nil
 }
 
-func validateArgs(username string, password string, email string) error {
+func validateArgs(username string, email string) error {
 	if len(username) < 1 {
 		return ErrEmptyUserName
 	}
-	if len(password) < 8 {
-		return ErrInvalidPassword
-	}
+
 	if !strings.Contains(email, "@") {
 		return ErrInvalidEmail
 	}
 
 	return nil
+}
+
+func nextID() ID {
+	return ID(xid.New().String())
+}
+
+func hashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	if err != nil {
+		return "", errors.New("error hashing password")
+	}
+	return string(hash), nil
+}
+
+func checkPasswordHash(hash, password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }

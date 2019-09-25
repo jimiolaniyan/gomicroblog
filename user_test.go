@@ -6,35 +6,29 @@ import (
 )
 
 func TestNewUser_ReturnsErrorForEmptyUsername(t *testing.T) {
-	user, err := NewUser("", "", "")
+	user, err := NewUser("", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
 }
 
-func TestNewUser_ReturnsErrorForPassWordBelowEightCharacters(t *testing.T) {
-	user, err := NewUser("username", "passwor", "")
+func TestHashPassword_ReturnsCorrectHash(t *testing.T) {
+	p := "password"
+	hash, err := hashPassword(p)
 
-	assert.Error(t, err)
-	assert.Nil(t, user)
-}
-
-func TestNewUser_ReturnsErrorForEmptyPassword(t *testing.T) {
-	user, err := NewUser("username", "", "")
-
-	assert.Error(t, err)
-	assert.Nil(t, user)
+	assert.Nil(t, err)
+	assert.True(t, checkPasswordHash(hash, p))
 }
 
 func TestNewUser_ReturnsErrorForEmptyEmail(t *testing.T) {
-	user, err := NewUser("username", "password", "")
+	user, err := NewUser("username", "")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
 }
 
 func TestNewUser_ReturnsErrorForInvalidEmail(t *testing.T) {
-	user, err := NewUser("username", "password", "email")
+	user, err := NewUser("username", "email")
 
 	assert.Error(t, err)
 	assert.Nil(t, user)
@@ -42,13 +36,11 @@ func TestNewUser_ReturnsErrorForInvalidEmail(t *testing.T) {
 
 func TestNewUser_ReturnsUserWithSpecifiedArguments(t *testing.T) {
 	username := "user"
-	password := "password"
 	email := "email@email.com"
 
-	user, err := NewUser(username, password, email)
+	user, err := NewUser(username, email)
 
 	assert.Nil(t, err)
 	assert.Equal(t, username, user.username)
-	assert.Equal(t, password, user.password)
 	assert.Equal(t, email, user.email)
 }

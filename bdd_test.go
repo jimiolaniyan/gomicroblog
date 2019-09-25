@@ -36,7 +36,7 @@ func (suite *UserTestSuite) TestRegisterNewUser() {
 				dbUser, err := suite.svc.users.FindByName(username)
 
 				So(err, ShouldBeNil)
-				So(user.username, ShouldEqual, dbUser.username)
+				So(user.ID, ShouldEqual, dbUser.ID)
 			})
 		})
 

@@ -1,13 +1,15 @@
 package gomicroblog
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type service struct {
 	users Repository
 }
 
 func (svc *service) RegisterNewUser(username string, password string, email string) (*user, error) {
-	user, err := NewUser(username, password, email)
+	user, err := NewUser(username, email)
 	if err != nil {
 		return nil, err
 	}
@@ -19,6 +21,8 @@ func (svc *service) RegisterNewUser(username string, password string, email stri
 	if u, _ := svc.users.FindByEmail(email); u != nil {
 		return nil, fmt.Errorf("email in use")
 	}
+
+	user.ID = nextID()
 
 	if err = svc.users.Store(user); err != nil {
 		return nil, fmt.Errorf("error saving user: %s ", err)
