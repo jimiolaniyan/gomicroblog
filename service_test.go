@@ -1,33 +1,42 @@
 package gomicroblog
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 	"testing"
 )
 
-func TestExistingUsernameCannotBeReused(t *testing.T) {
-	svc := service{users: NewUserRepository()}
-	user1, _ := svc.RegisterNewUser("username", "password", "a@b")
-	_ = svc.users.Store(user1)
-
-	user2, err := svc.RegisterNewUser("username", "password1", "b@c")
-
-	fmt.Println(err)
-
-	assert.Nil(t, user2)
-	assert.NotNil(t, err)
+type ServiceTestSuite struct {
+	suite.Suite
+	svc service
 }
 
-func TestExistingEmailCannotBeReused(t *testing.T) {
-	svc := service{users: NewUserRepository()}
-	user1, _ := svc.RegisterNewUser("username", "password", "a@b")
-	_ = svc.users.Store(user1)
+func (suite *ServiceTestSuite) SetupTest() {
+	suite.svc = service{users: NewUserRepository()}
+}
 
-	user2, err := svc.RegisterNewUser("username2", "password1", "a@b")
+func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserANewID() {
+	user1, _ := suite.svc.RegisterNewUser("username", "password", "a@b")
 
-	fmt.Println(err)
+	assert.Greater(suite.T(), len(user1.ID), 1)
+}
 
-	assert.Nil(t, user2)
-	assert.NotNil(t, err)
+func (suite *ServiceTestSuite) TestExistingUsername_CannotBeReused() {
+	_, err := suite.svc.RegisterNewUser("username", "password", "a@b")
+	user, err := suite.svc.RegisterNewUser("username", "password1", "b@c")
+
+	assert.Nil(suite.T(), user)
+	assert.NotNil(suite.T(), err)
+}
+
+func (suite *ServiceTestSuite) TestExistingEmail_CannotBeReused() {
+	_, err := suite.svc.RegisterNewUser("username", "password", "a@b")
+	user2, err := suite.svc.RegisterNewUser("username2", "password1", "a@b")
+
+	assert.Nil(suite.T(), user2)
+	assert.NotNil(suite.T(), err)
+}
+
+func TestServiceSuite(t *testing.T) {
+	suite.Run(t, new(ServiceTestSuite))
 }
