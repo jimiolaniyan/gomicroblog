@@ -18,7 +18,13 @@ func (suite *ServiceTestSuite) SetupTest() {
 func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserANewID() {
 	user1, _ := suite.svc.RegisterNewUser("username", "password", "a@b")
 
-	assert.Greater(suite.T(), len(user1.ID), 1)
+	assert.Greater(suite.T(), len(user1.ID), 2)
+}
+
+func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() {
+	user1, _ := suite.svc.RegisterNewUser("username", "password", "a@b")
+
+	assert.True(suite.T(), checkPasswordHash(user1.password, "password"))
 }
 
 func (suite *ServiceTestSuite) TestExistingUsername_CannotBeReused() {

@@ -23,6 +23,9 @@ func (svc *service) RegisterNewUser(username string, password string, email stri
 	}
 
 	user.ID = nextID()
+	if hash, err := hashPassword(password); err == nil {
+		user.password = hash
+	}
 
 	if err = svc.users.Store(user); err != nil {
 		return nil, fmt.Errorf("error saving user: %s ", err)
