@@ -14,6 +14,10 @@ func (svc *service) RegisterNewUser(username string, password string, email stri
 		return nil, err
 	}
 
+	if len(password) < 8 {
+		return nil, ErrInvalidPassword
+	}
+
 	if u, _ := svc.users.FindByName(username); u != nil {
 		return nil, fmt.Errorf("username in use")
 	}
