@@ -18,12 +18,8 @@ func (svc *service) RegisterNewUser(username string, password string, email stri
 		return nil, ErrInvalidPassword
 	}
 
-	if u, _ := svc.users.FindByName(username); u != nil {
-		return nil, fmt.Errorf("username in use")
-	}
-
-	if u, _ := svc.users.FindByEmail(email); u != nil {
-		return nil, fmt.Errorf("email in use")
+	if _, err := verifyNotInUse(svc, username, email); err != nil {
+		return nil, err
 	}
 
 	user.ID = nextID()
@@ -36,4 +32,14 @@ func (svc *service) RegisterNewUser(username string, password string, email stri
 	}
 
 	return user, nil
+}
+
+func verifyNotInUse(svc *service, username string, email string) (*user, error) {
+	if u, _ := svc.users.FindByName(username); u != nil {
+		return nil, fmt.Errorf("username in use")
+	}
+	if u, _ := svc.users.FindByEmail(email); u != nil {
+		return nil, fmt.Errorf("email in use")
+	}
+	return nil, nil
 }
