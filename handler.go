@@ -5,13 +5,18 @@ import (
 	"net/http"
 )
 
-type registerUserRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
+type Responder interface {
 }
 
-func decodeRequest(ur registerUserRequest, r *http.Request) (registerUserRequest, error) {
+func RegisterUserHandler(svc Service, res Responder) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rm, _ := decodeRegisterUserRequest(r)
+		_, _ = svc.RegisterNewUser(rm, res)
+	})
+}
+
+func decodeRegisterUserRequest(r *http.Request) (registerUserRequest, error) {
+	ur := registerUserRequest{}
 	if err := json.NewDecoder(r.Body).Decode(&ur); err != nil {
 		return registerUserRequest{}, err
 	}

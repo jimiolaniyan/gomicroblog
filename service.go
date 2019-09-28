@@ -4,8 +4,18 @@ import (
 	"fmt"
 )
 
+type Service interface {
+	RegisterNewUser(rm registerUserRequest, res Responder) (*user, error)
+}
+
 type service struct {
 	users Repository
+}
+
+type registerUserRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
 }
 
 func (svc *service) RegisterNewUser(username string, password string, email string) (*user, error) {

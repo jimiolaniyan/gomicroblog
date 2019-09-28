@@ -2,45 +2,66 @@ package gomicroblog
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-func TestDecodeRequest(t *testing.T) {
-	request := `
+type HandlerTestSuite struct {
+	suite.Suite
+	registerReq string
+}
+
+func (suite *HandlerTestSuite) SetupTest() {
+	suite.registerReq = `
 		{
 			"username":"jimi",
 			"password":"password1",
-			"email":"a@b"
+			"email":"test@tester.test"
 		}
 `
-	r := httptest.NewRequest("POST", "/users/v1/new", strings.NewReader(request))
-	var d registerUserRequest
-	body, err := decodeRequest(d, r)
-
-	assert.Nil(t, err)
-	assert.Equal(t, "jimi", body.Username)
-	assert.Equal(t, "password1", body.Password)
-	assert.Equal(t, "a@b", body.Email)
 }
 
-func TestDecodeRequestReturnsErrorForInvalidRequest(t *testing.T) {
+func (suite *HandlerTestSuite) TestDecodeRequest() {
+	r := httptest.NewRequest("POST", "/users/v1/new", strings.NewReader(suite.registerReq))
+
+	body, err := decodeRegisterUserRequest(r)
+
+	assert.Nil(suite.T(), err)
+	assert.Equal(suite.T(), "jimi", body.Username)
+	assert.Equal(suite.T(), "password1", body.Password)
+	assert.Equal(suite.T(), "test@tester.test", body.Email)
+}
+
+func (suite *HandlerTestSuite) TestDecodeRequestReturnsErrorForInvalidRequest() {
 	request := `name`
 	r := httptest.NewRequest("POST", "/users/v1/new", strings.NewReader(request))
 
-	var d registerUserRequest
-	_, err := decodeRequest(d, r)
+	_, err := decodeRegisterUserRequest(r)
 
-	assert.NotNil(t, err)
+	assert.NotNil(suite.T(), err)
 }
 
-func TestHandlerGeneratesRequestModel(t *testing.T) {
+func (suite *HandlerTestSuite) TestHandlerInvokesServiceWithRequestAndResponder() {
 
-}
+	r, err := http.NewRequest("POST", "/users/v1/new", strings.NewReader(suite.registerReq))
+	assert.Nil(suite.T(), err)
 
-func TestHandlerInvokesServiceWithRequestModelAndResponseGateway(t *testing.T) {
+	svc := &ServiceSpy{}
+	responderSpy := &ResponderSpy{}
 
+	w := httptest.NewRecorder()
+	handler := http.NewServeMux()
+	handler.Handle("/users/v1/new", RegisterUserHandler(svc, responderSpy))
+	handler.ServeHTTP(w, r)
+
+	assert.True(suite.T(), svc.registerNewUserWasCalled)
+	assert.Equal(suite.T(), "jimi", svc.request.Username)
+	assert.Equal(suite.T(), "password1", svc.request.Password)
+	assert.Equal(suite.T(), "test@tester.test", svc.request.Email)
+	assert.Equal(suite.T(), responderSpy, svc.responder)
 }
 
 //func TestServiceCallsFormatterWithResponseModel(t *testing.T) {
@@ -53,4 +74,24 @@ func TestHandlerInvokesServiceWithRequestModelAndResponseGateway(t *testing.T) {
 
 func TestHandlerSendsFormattedModelToEncoder(t *testing.T) {
 
+}
+
+type ServiceSpy struct {
+	registerNewUserWasCalled bool
+	request                  registerUserRequest
+	responder                Responder
+}
+
+func (s *ServiceSpy) RegisterNewUser(rm registerUserRequest, res Responder) (*user, error) {
+	s.registerNewUserWasCalled = true
+	s.request = rm
+	s.responder = res
+	return nil, nil
+}
+
+type ResponderSpy struct {
+}
+
+func TestHandlerSuite(t *testing.T) {
+	suite.Run(t, new(HandlerTestSuite))
 }
