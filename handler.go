@@ -8,10 +8,15 @@ import (
 type Responder interface {
 }
 
-func RegisterUserHandler(svc Service, res Responder) http.Handler {
+type registerUserResponse struct {
+	ID ID `json:"id"`
+}
+
+func RegisterUserHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rm, _ := decodeRegisterUserRequest(r)
-		svc.RegisterNewUser(rm, res)
+		id, _ := svc.RegisterNewUser(rm)
+		json.NewEncoder(w).Encode(&registerUserResponse{ID: id})
 	})
 }
 

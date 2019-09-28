@@ -1,6 +1,8 @@
 package gomicroblog
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"net/http"
@@ -45,35 +47,40 @@ func (suite *HandlerTestSuite) TestDecodeRequestReturnsErrorForInvalidRequest() 
 }
 
 func (suite *HandlerTestSuite) TestHandlerInvokesServiceWithRequestAndResponder() {
-
 	r, err := http.NewRequest("POST", "/users/v1/new", strings.NewReader(suite.registerReq))
 	assert.Nil(suite.T(), err)
 
 	svc := &ServiceSpy{}
-	responderSpy := &ResponderSpy{}
 
 	w := httptest.NewRecorder()
 	handler := http.NewServeMux()
-	handler.Handle("/users/v1/new", RegisterUserHandler(svc, responderSpy))
+	handler.Handle("/users/v1/new", RegisterUserHandler(svc))
 	handler.ServeHTTP(w, r)
 
 	assert.True(suite.T(), svc.registerNewUserWasCalled)
 	assert.Equal(suite.T(), "jimi", svc.request.Username)
 	assert.Equal(suite.T(), "password1", svc.request.Password)
 	assert.Equal(suite.T(), "test@tester.test", svc.request.Email)
-	assert.Equal(suite.T(), responderSpy, svc.responder)
 }
 
-//func TestServiceCallsFormatterWithResponseModel(t *testing.T) {
-//
-//}
-//
-//func TestFormatterGeneratesFormattedModel(t *testing.T) {
-//
-//}
+func (suite *HandlerTestSuite) TestHandlerReturnsEncodedResponse() {
+	r, err := http.NewRequest("POST", "/users/v1/new", strings.NewReader(suite.registerReq))
+	assert.Nil(suite.T(), err)
 
-func TestHandlerSendsFormattedModelToEncoder(t *testing.T) {
+	svc := &service{users: NewUserRepository()}
+	w := httptest.NewRecorder()
+	handler := http.NewServeMux()
+	handler.Handle("/users/v1/new", RegisterUserHandler(svc))
+	handler.ServeHTTP(w, r)
 
+	var res struct {
+		ID ID `json:"id"`
+	}
+
+	json.NewDecoder(w.Body).Decode(&res)
+	fmt.Println(res.ID)
+	assert.Equal(suite.T(), http.StatusOK, w.Code)
+	assert.Greater(suite.T(), len(res.ID), 3)
 }
 
 type ServiceSpy struct {
@@ -82,11 +89,10 @@ type ServiceSpy struct {
 	responder                Responder
 }
 
-func (s *ServiceSpy) RegisterNewUser(req registerUserRequest, res Responder) {
+func (s *ServiceSpy) RegisterNewUser(req registerUserRequest) (ID, error) {
 	s.registerNewUserWasCalled = true
 	s.request = req
-	s.responder = res
-	return
+	return "", nil
 }
 
 type ResponderSpy struct {

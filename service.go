@@ -5,7 +5,7 @@ import (
 )
 
 type Service interface {
-	RegisterNewUser(req registerUserRequest, res Responder)
+	RegisterNewUser(req registerUserRequest) (ID, error)
 }
 
 type service struct {
