@@ -11,6 +11,7 @@ type Repository interface {
 	FindByName(username string) (*user, error)
 	Store(u *user) error
 	FindByEmail(e string) (*user, error)
+	FindByID(id ID) (*user, error)
 }
 
 type ID string

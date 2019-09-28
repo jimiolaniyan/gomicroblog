@@ -19,30 +19,33 @@ func (suite *ServiceTestSuite) SetupTest() {
 
 func (suite *ServiceTestSuite) TestExistingUsername_CannotBeReused() {
 	_, err := suite.svc.RegisterNewUser(suite.req)
-	user, err := suite.svc.RegisterNewUser(registerUserRequest{"username", "password1", "b@c"})
+	userID, err := suite.svc.RegisterNewUser(registerUserRequest{"username", "password1", "b@c"})
 
-	assert.Nil(suite.T(), user)
+	assert.Equal(suite.T(), "", string(userID))
 	assert.NotNil(suite.T(), err)
 }
 
 func (suite *ServiceTestSuite) TestExistingEmail_CannotBeReused() {
 	_, err := suite.svc.RegisterNewUser(suite.req)
-	user2, err := suite.svc.RegisterNewUser(registerUserRequest{"username2", "password1", "a@b"})
+	userID, err := suite.svc.RegisterNewUser(registerUserRequest{"username2", "password1", "a@b"})
 
-	assert.Nil(suite.T(), user2)
+	assert.Equal(suite.T(), "", string(userID))
 	assert.NotNil(suite.T(), err)
 }
 
 func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserANewID() {
-	user1, _ := suite.svc.RegisterNewUser(suite.req)
+	userID, _ := suite.svc.RegisterNewUser(suite.req)
 
-	assert.Greater(suite.T(), len(user1.ID), 2)
+	assert.Greater(suite.T(), len(userID), 2)
 }
 
 func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() {
-	user1, _ := suite.svc.RegisterNewUser(suite.req)
+	userID, _ := suite.svc.RegisterNewUser(suite.req)
 
-	assert.True(suite.T(), checkPasswordHash(user1.password, "password"))
+	user, err := suite.svc.users.FindByID(userID)
+
+	assert.Nil(suite.T(), err)
+	assert.True(suite.T(), checkPasswordHash(user.password, "password"))
 }
 
 func (suite *ServiceTestSuite) TestPasswordLength_MustBeAtLeastEight() {

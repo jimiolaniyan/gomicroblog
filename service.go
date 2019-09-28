@@ -18,21 +18,21 @@ type registerUserRequest struct {
 	Email    string `json:"email"`
 }
 
-func (svc *service) RegisterNewUser(req registerUserRequest) (*user, error) {
+func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 	u := req.Username
 	e := req.Email
 	user, err := NewUser(u, e)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	p := req.Password
 	if len(p) < 8 {
-		return nil, ErrInvalidPassword
+		return "", ErrInvalidPassword
 	}
 
 	if _, err := verifyNotInUse(svc, u, e); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	user.ID = nextID()
@@ -41,10 +41,10 @@ func (svc *service) RegisterNewUser(req registerUserRequest) (*user, error) {
 	}
 
 	if err = svc.users.Store(user); err != nil {
-		return nil, fmt.Errorf("error saving user: %s ", err)
+		return "", fmt.Errorf("error saving user: %s ", err)
 	}
 
-	return user, nil
+	return user.ID, nil
 }
 
 func verifyNotInUse(svc *service, username string, email string) (*user, error) {

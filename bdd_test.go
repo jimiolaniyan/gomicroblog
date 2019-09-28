@@ -20,7 +20,7 @@ func (suite *UserTestSuite) TestRegisterNewUser() {
 		req := registerUserRequest{"username", "password", "user@email.com"}
 
 		Convey("When user registers", func() {
-			user, err := suite.svc.RegisterNewUser(req)
+			userID, err := suite.svc.RegisterNewUser(req)
 
 			var created bool
 			if err != nil {
@@ -34,7 +34,7 @@ func (suite *UserTestSuite) TestRegisterNewUser() {
 				dbUser, err := suite.svc.users.FindByName("username")
 
 				So(err, ShouldBeNil)
-				So(user.ID, ShouldEqual, dbUser.ID)
+				So(userID, ShouldEqual, dbUser.ID)
 			})
 		})
 

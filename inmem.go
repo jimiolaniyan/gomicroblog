@@ -1,12 +1,19 @@
 package gomicroblog
 
 type userRepository struct {
-	users map[string]*user
+	users map[ID]*user
 }
 
-func (repo *userRepository) FindByEmail(e string) (*user, error) {
+func (repo *userRepository) FindByID(id ID) (*user, error) {
+	if u, ok := repo.users[id]; ok {
+		return u, nil
+	}
+	return nil, ErrNotFound
+}
+
+func (repo *userRepository) FindByEmail(email string) (*user, error) {
 	for _, v := range repo.users {
-		if v.email == e {
+		if v.email == email {
 			return v, nil
 		}
 	}
@@ -14,17 +21,19 @@ func (repo *userRepository) FindByEmail(e string) (*user, error) {
 }
 
 func (repo *userRepository) Store(user *user) error {
-	repo.users[user.username] = user
+	repo.users[user.ID] = user
 	return nil
 }
 
 func (repo *userRepository) FindByName(username string) (*user, error) {
-	if u, ok := repo.users[username]; ok {
-		return u, nil
+	for _, v := range repo.users {
+		if v.username == username {
+			return v, nil
+		}
 	}
 	return nil, ErrNotFound
 }
 
 func NewUserRepository() Repository {
-	return &userRepository{users: map[string]*user{}}
+	return &userRepository{users: map[ID]*user{}}
 }
