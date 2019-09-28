@@ -82,11 +82,11 @@ type ServiceSpy struct {
 	responder                Responder
 }
 
-func (s *ServiceSpy) RegisterNewUser(rm registerUserRequest, res Responder) (*user, error) {
+func (s *ServiceSpy) RegisterNewUser(req registerUserRequest, res Responder) {
 	s.registerNewUserWasCalled = true
-	s.request = rm
+	s.request = req
 	s.responder = res
-	return nil, nil
+	return
 }
 
 type ResponderSpy struct {

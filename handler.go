@@ -11,7 +11,7 @@ type Responder interface {
 func RegisterUserHandler(svc Service, res Responder) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rm, _ := decodeRegisterUserRequest(r)
-		_, _ = svc.RegisterNewUser(rm, res)
+		svc.RegisterNewUser(rm, res)
 	})
 }
 

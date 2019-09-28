@@ -17,12 +17,10 @@ func (suite *UserTestSuite) SetupTest() {
 
 func (suite *UserTestSuite) TestRegisterNewUser() {
 	Convey("Given new user with username, email and password", suite.T(), func() {
-		username := "username"
-		email := "user@email.com"
-		password := "password"
+		req := registerUserRequest{"username", "password", "user@email.com"}
 
 		Convey("When user registers", func() {
-			user, err := suite.svc.RegisterNewUser(username, password, email)
+			user, err := suite.svc.RegisterNewUser(req)
 
 			var created bool
 			if err != nil {
@@ -33,7 +31,7 @@ func (suite *UserTestSuite) TestRegisterNewUser() {
 
 			So(created, ShouldEqual, true)
 			Convey("Then the created user has username", func() {
-				dbUser, err := suite.svc.users.FindByName(username)
+				dbUser, err := suite.svc.users.FindByName("username")
 
 				So(err, ShouldBeNil)
 				So(user.ID, ShouldEqual, dbUser.ID)

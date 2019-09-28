@@ -5,7 +5,7 @@ import (
 )
 
 type Service interface {
-	RegisterNewUser(rm registerUserRequest, res Responder) (*user, error)
+	RegisterNewUser(req registerUserRequest, res Responder)
 }
 
 type service struct {
@@ -18,22 +18,25 @@ type registerUserRequest struct {
 	Email    string `json:"email"`
 }
 
-func (svc *service) RegisterNewUser(username string, password string, email string) (*user, error) {
-	user, err := NewUser(username, email)
+func (svc *service) RegisterNewUser(req registerUserRequest) (*user, error) {
+	u := req.Username
+	e := req.Email
+	user, err := NewUser(u, e)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(password) < 8 {
+	p := req.Password
+	if len(p) < 8 {
 		return nil, ErrInvalidPassword
 	}
 
-	if _, err := verifyNotInUse(svc, username, email); err != nil {
+	if _, err := verifyNotInUse(svc, u, e); err != nil {
 		return nil, err
 	}
 
 	user.ID = nextID()
-	if hash, err := hashPassword(password); err == nil {
+	if hash, err := hashPassword(p); err == nil {
 		user.password = hash
 	}
 
