@@ -5,13 +5,6 @@ import (
 	"net/http"
 )
 
-type Responder interface {
-}
-
-type registerUserResponse struct {
-	ID ID `json:"id"`
-}
-
 func RegisterUserHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rm, _ := decodeRegisterUserRequest(r)

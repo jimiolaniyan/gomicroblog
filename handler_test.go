@@ -46,7 +46,7 @@ func (suite *HandlerTestSuite) TestDecodeRequestReturnsErrorForInvalidRequest() 
 	assert.NotNil(suite.T(), err)
 }
 
-func (suite *HandlerTestSuite) TestHandlerInvokesServiceWithRequestAndResponder() {
+func (suite *HandlerTestSuite) TestHandlerInvokesServiceWithRequest() {
 	r, err := http.NewRequest("POST", "/users/v1/new", strings.NewReader(suite.registerReq))
 	assert.Nil(suite.T(), err)
 
@@ -86,16 +86,12 @@ func (suite *HandlerTestSuite) TestHandlerReturnsEncodedResponse() {
 type ServiceSpy struct {
 	registerNewUserWasCalled bool
 	request                  registerUserRequest
-	responder                Responder
 }
 
 func (s *ServiceSpy) RegisterNewUser(req registerUserRequest) (ID, error) {
 	s.registerNewUserWasCalled = true
 	s.request = req
 	return "", nil
-}
-
-type ResponderSpy struct {
 }
 
 func TestHandlerSuite(t *testing.T) {

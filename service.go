@@ -18,6 +18,10 @@ type registerUserRequest struct {
 	Email    string `json:"email"`
 }
 
+type registerUserResponse struct {
+	ID ID `json:"id"`
+}
+
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 	u := req.Username
 	e := req.Email
