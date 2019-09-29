@@ -56,3 +56,7 @@ func verifyNotInUse(svc *service, username string, email string) (*user, error) 
 	}
 	return nil, nil
 }
+
+func NewService(repo Repository) Service {
+	return &service{users: repo}
+}

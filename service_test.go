@@ -54,6 +54,14 @@ func (suite *ServiceTestSuite) TestPasswordLength_MustBeAtLeastEight() {
 	assert.Error(suite.T(), err)
 }
 
+func (suite *ServiceTestSuite) TestNewService() {
+	users := NewUserRepository()
+	svc := NewService(users)
+	s := svc.(*service)
+
+	assert.Equal(suite.T(), users, s.users)
+}
+
 func TestServiceSuite(t *testing.T) {
 	suite.Run(t, new(ServiceTestSuite))
 }
