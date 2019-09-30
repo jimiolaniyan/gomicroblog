@@ -3,7 +3,7 @@ language: go
 branches:
   only:
     - master
-    - feature/register-new-user
+    - /^feature\/.+$/
 go:
   - 1.11.x
 env:
