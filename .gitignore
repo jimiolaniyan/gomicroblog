@@ -28,3 +28,4 @@ cmake-build-release/
 # Editor-based Rest Client
 .idea/httpRequests
 notes.md
+vendor
