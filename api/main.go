@@ -12,6 +12,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/users/v1/new", blog.RegisterUserHandler(svc))
-
-	log.Fatal(http.ListenAndServe(":8090", mux))
+	port := "8090"
+	log.Printf("Listening on port: %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
