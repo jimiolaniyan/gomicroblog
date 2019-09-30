@@ -1,5 +1,9 @@
 language: go
 
+branches:
+  only:
+    - master
+    - feature/register-new-user
 go:
   - 1.11.x
 env:
