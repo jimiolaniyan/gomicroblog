@@ -5,13 +5,6 @@ import (
 	"testing"
 )
 
-func TestNewUser_ReturnsErrorForEmptyUsername(t *testing.T) {
-	user, err := NewUser("", "")
-
-	assert.Error(t, err)
-	assert.Nil(t, user)
-}
-
 func TestHashPassword_ReturnsCorrectHash(t *testing.T) {
 	p := "password"
 	hash, err := hashPassword(p)
@@ -20,27 +13,21 @@ func TestHashPassword_ReturnsCorrectHash(t *testing.T) {
 	assert.True(t, checkPasswordHash(hash, p))
 }
 
-func TestNewUser_ReturnsErrorForEmptyEmail(t *testing.T) {
-	user, err := NewUser("username", "")
+func TestNewUser(t *testing.T) {
+	tests := []struct {
+		username, email string
+		wantErr         error
+		wantUser        *user
+	}{
+		{"", "", ErrEmptyUserName, nil},
+		{"username", "", ErrInvalidEmail, nil},
+		{"username", "email", ErrInvalidEmail, nil},
+		{"user", "email@email.com", nil, &user{username: "user", email: "email@email.com"}},
+	}
 
-	assert.Error(t, err)
-	assert.Nil(t, user)
-}
-
-func TestNewUser_ReturnsErrorForInvalidEmail(t *testing.T) {
-	user, err := NewUser("username", "email")
-
-	assert.Error(t, err)
-	assert.Nil(t, user)
-}
-
-func TestNewUser_ReturnsUserWithSpecifiedArguments(t *testing.T) {
-	username := "user"
-	email := "email@email.com"
-
-	user, err := NewUser(username, email)
-
-	assert.Nil(t, err)
-	assert.Equal(t, username, user.username)
-	assert.Equal(t, email, user.email)
+	for _, tt := range tests {
+		user, err := NewUser(tt.username, tt.email)
+		assert.Equal(t, tt.wantErr, err)
+		assert.Equal(t, tt.wantUser, user)
+	}
 }

@@ -17,20 +17,39 @@ func (suite *ServiceTestSuite) SetupTest() {
 	suite.req = registerUserRequest{"username", "password", "a@b"}
 }
 
-func (suite *ServiceTestSuite) TestExistingUsername_CannotBeReused() {
-	_, err := suite.svc.RegisterNewUser(suite.req)
-	userID, err := suite.svc.RegisterNewUser(registerUserRequest{"username", "password1", "b@c"})
+func (suite *ServiceTestSuite) TestService_RegisterNewUser() {
+	tests := []struct {
+		req     *registerUserRequest
+		wantID  string
+		wantErr error
+	}{
+		{
+			req: &registerUserRequest{
+				"username",
+				"password1",
+				"b@c",
+			},
+			wantID:  "",
+			wantErr: ErrExistingUsernameOrEmail,
+		},
+		{
+			req: &registerUserRequest{
+				"username2",
+				"password1",
+				"a@b",
+			},
+			wantID:  "",
+			wantErr: ErrExistingUsernameOrEmail,
+		},
+	}
 
-	assert.Equal(suite.T(), "", string(userID))
-	assert.NotNil(suite.T(), err)
-}
+	for _, tt := range tests {
+		_, err := suite.svc.RegisterNewUser(suite.req)
+		userID, err := suite.svc.RegisterNewUser(*tt.req)
 
-func (suite *ServiceTestSuite) TestExistingEmail_CannotBeReused() {
-	_, err := suite.svc.RegisterNewUser(suite.req)
-	userID, err := suite.svc.RegisterNewUser(registerUserRequest{"username2", "password1", "a@b"})
-
-	assert.Equal(suite.T(), "", string(userID))
-	assert.NotNil(suite.T(), err)
+		assert.Equal(suite.T(), tt.wantID, string(userID))
+		assert.Equal(suite.T(), tt.wantErr, err)
+	}
 }
 
 func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserANewID() {

@@ -32,10 +32,11 @@ type user struct {
 //}
 
 var (
-	ErrNotFound        = errors.New("user not found")
-	ErrEmptyUserName   = errors.New("username cannot be empty")
-	ErrInvalidPassword = errors.New("invalid password")
-	ErrInvalidEmail    = errors.New("invalid email address")
+	ErrNotFound                = errors.New("user not found")
+	ErrEmptyUserName           = errors.New("username cannot be empty")
+	ErrInvalidPassword         = errors.New("invalid password")
+	ErrInvalidEmail            = errors.New("invalid email address")
+	ErrExistingUsernameOrEmail = errors.New("username in use")
 )
 
 func NewUser(username, email string) (*user, error) {

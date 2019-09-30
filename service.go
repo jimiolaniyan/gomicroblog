@@ -53,10 +53,10 @@ func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 
 func verifyNotInUse(svc *service, username string, email string) (*user, error) {
 	if u, _ := svc.users.FindByName(username); u != nil {
-		return nil, fmt.Errorf("username in use")
+		return nil, ErrExistingUsernameOrEmail
 	}
 	if u, _ := svc.users.FindByEmail(email); u != nil {
-		return nil, fmt.Errorf("email in use")
+		return nil, ErrExistingUsernameOrEmail
 	}
 	return nil, nil
 }

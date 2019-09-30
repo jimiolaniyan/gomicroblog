@@ -27,7 +27,7 @@ func (suite *HandlerTestSuite) SetupTest() {
 }
 
 func (suite *HandlerTestSuite) TestDecodeRequest() {
-	r := httptest.NewRequest("POST", "/users/v1/new", strings.NewReader(suite.registerReq))
+	r := httptest.NewRequest(http.MethodPost, "/users/v1/new", strings.NewReader(suite.registerReq))
 
 	body, err := decodeRegisterUserRequest(r)
 
@@ -39,7 +39,7 @@ func (suite *HandlerTestSuite) TestDecodeRequest() {
 
 func (suite *HandlerTestSuite) TestDecodeRequestReturnsErrorForInvalidRequest() {
 	request := `name`
-	r := httptest.NewRequest("POST", "/users/v1/new", strings.NewReader(request))
+	r := httptest.NewRequest(http.MethodPost, "/users/v1/new", strings.NewReader(request))
 
 	_, err := decodeRegisterUserRequest(r)
 
@@ -47,7 +47,7 @@ func (suite *HandlerTestSuite) TestDecodeRequestReturnsErrorForInvalidRequest() 
 }
 
 func (suite *HandlerTestSuite) TestHandlerInvokesServiceWithRequest() {
-	r, err := http.NewRequest("POST", "/users/v1/new", strings.NewReader(suite.registerReq))
+	r, err := http.NewRequest(http.MethodPost, "/users/v1/new", strings.NewReader(suite.registerReq))
 	assert.Nil(suite.T(), err)
 
 	svc := &ServiceSpy{}
