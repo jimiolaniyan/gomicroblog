@@ -28,7 +28,7 @@ func (suite *HandlerTestSuite) SetupTest() {
 }
 
 func (suite *HandlerTestSuite) TestDecodeRequest() {
-	r := httptest.NewRequest(http.MethodPost, "/users/v1/new", strings.NewReader(suite.registerReq))
+	r := httptest.NewRequest(http.MethodPost, "/v1/users/new", strings.NewReader(suite.registerReq))
 
 	body, err := decodeRegisterUserRequest(r)
 
@@ -39,14 +39,14 @@ func (suite *HandlerTestSuite) TestDecodeRequest() {
 }
 
 func (suite *HandlerTestSuite) TestHandlerInvokesServiceWithRequest() {
-	r, err := http.NewRequest(http.MethodPost, "/users/v1/new", strings.NewReader(suite.registerReq))
+	r, err := http.NewRequest(http.MethodPost, "/v1/users/new", strings.NewReader(suite.registerReq))
 	assert.Nil(suite.T(), err)
 
 	svc := &ServiceSpy{}
 
 	w := httptest.NewRecorder()
 	handler := http.NewServeMux()
-	handler.Handle("/users/v1/new", RegisterUserHandler(svc))
+	handler.Handle("/v1/users/new", RegisterUserHandler(svc))
 	handler.ServeHTTP(w, r)
 
 	assert.True(suite.T(), svc.registerNewUserWasCalled)
@@ -57,7 +57,7 @@ func (suite *HandlerTestSuite) TestHandlerInvokesServiceWithRequest() {
 
 func TestHandlerResponses(t *testing.T) {
 	svc := &service{users: NewUserRepository()}
-	url := "/users/v1/new"
+	url := "/v1/users/new"
 	registerHandler := RegisterUserHandler(svc)
 	registerReq := `
 		{
@@ -79,7 +79,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.StatusCreated,
 			3,
 			errors.New(""),
-			"/users/v1/new/",
+			"/v1/users",
 			false,
 		},
 		{
@@ -165,6 +165,7 @@ func TestHandlerResponses(t *testing.T) {
 			assert.Equal(t, tt.wantCode, w.Code)
 			assert.Equal(t, tt.wantErr.Error(), res.Err)
 			assert.Greater(t, len(res.ID), tt.wantMinLen)
+			assert.Equal(t, w.Header().Get("Content-Type"), "application/json")
 			assert.True(t, strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
 		})
 	}

@@ -17,7 +17,7 @@ application in Golang using TDD, BDD and Robert C. Martin's Clean Architecture.
 ### Register new user
 ```
 curl -X GET \
-  http://localhost:8090/users/v1/new \
+  http://localhost:8090/v1/users/new \
   -H 'Content-Type: application/json' \
   -d '{
 	"username": "jimi",

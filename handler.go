@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 func RegisterUserHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rm, err := decodeRegisterUserRequest(r)
+		w.Header().Set("Content-Type", "application/json")
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -18,9 +20,12 @@ func RegisterUserHandler(svc Service) http.Handler {
 			encodeError(err, w)
 			return
 		}
+		location := strings.Join(strings.Split(r.URL.Path, "/")[0:3], "/")
+		w.Header().Set("Location", fmt.Sprintf("%s/%s", location, id))
 		w.WriteHeader(http.StatusCreated)
-		w.Header().Set("Location", fmt.Sprintf("%s/%s", r.URL.String(), id))
-		json.NewEncoder(w).Encode(&registerUserResponse{ID: id})
+		if err := json.NewEncoder(w).Encode(&registerUserResponse{ID: id}); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	})
 }
 
@@ -33,9 +38,11 @@ func encodeError(err error, w http.ResponseWriter) {
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"error": err.Error(),
-	})
+	}); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func decodeRegisterUserRequest(r *http.Request) (registerUserRequest, error) {
