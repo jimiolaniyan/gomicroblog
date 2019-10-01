@@ -22,27 +22,45 @@ func TestService_RegisterNewUser(t *testing.T) {
 	svc := service{users: NewUserRepository()}
 	req := registerUserRequest{"username", "password", "a@b"}
 	tests := []struct {
-		req     *registerUserRequest
-		wantID  string
-		wantErr error
+		req          *registerUserRequest
+		wantIDMinLen int
+		wantErr      error
 	}{
 		{
-			req: &registerUserRequest{
+			&registerUserRequest{
 				"username",
 				"password1",
 				"b@c",
 			},
-			wantID:  "",
-			wantErr: ErrExistingUsername,
+			-1,
+			ErrExistingUsername,
 		},
 		{
-			req: &registerUserRequest{
+			&registerUserRequest{
 				"username2",
 				"password1",
 				"a@b",
 			},
-			wantID:  "",
-			wantErr: ErrExistingEmail,
+			-1,
+			ErrExistingEmail,
+		},
+		{
+			&registerUserRequest{
+				"username2",
+				"passwod",
+				"b@c",
+			},
+			-1,
+			ErrInvalidPassword,
+		},
+		{
+			&registerUserRequest{
+				"username2",
+				"password",
+				"b@c.com",
+			},
+			5,
+			nil,
 		},
 	}
 
@@ -51,16 +69,10 @@ func TestService_RegisterNewUser(t *testing.T) {
 			_, err := svc.RegisterNewUser(req)
 			userID, err := svc.RegisterNewUser(*tt.req)
 
-			assert.Equal(t, tt.wantID, string(userID))
+			assert.Greater(t, len(string(userID)), tt.wantIDMinLen)
 			assert.Equal(t, tt.wantErr, err)
 		})
 	}
-}
-
-func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserANewID() {
-	userID, _ := suite.svc.RegisterNewUser(suite.req)
-
-	assert.Greater(suite.T(), len(userID), 2)
 }
 
 func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() {
@@ -70,12 +82,6 @@ func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() 
 
 	assert.Nil(suite.T(), err)
 	assert.True(suite.T(), checkPasswordHash(user.password, "password"))
-}
-
-func (suite *ServiceTestSuite) TestPasswordLength_MustBeAtLeastEight() {
-	_, err := suite.svc.RegisterNewUser(registerUserRequest{"username2", "passwod", "b@c"})
-
-	assert.Error(suite.T(), err)
 }
 
 func (suite *ServiceTestSuite) TestNewService() {
