@@ -25,17 +25,13 @@ type user struct {
 	email    string
 }
 
-//type Credentials struct{
-//	username string
-//	password string
-//	email    string
-//}
-
 var (
-	ErrNotFound        = errors.New("user not found")
-	ErrEmptyUserName   = errors.New("username cannot be empty")
-	ErrInvalidPassword = errors.New("invalid password")
-	ErrInvalidEmail    = errors.New("invalid email address")
+	ErrNotFound         = errors.New("user not found")
+	ErrEmptyUserName    = errors.New("username cannot be empty")
+	ErrInvalidPassword  = errors.New("invalid password")
+	ErrInvalidEmail     = errors.New("invalid email address")
+	ErrExistingUsername = errors.New("username in use")
+	ErrExistingEmail    = errors.New("email in use")
 )
 
 func NewUser(username, email string) (*user, error) {

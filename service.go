@@ -19,7 +19,8 @@ type registerUserRequest struct {
 }
 
 type registerUserResponse struct {
-	ID ID `json:"id"`
+	ID  ID    `json:"id,omitempty"`
+	Err error `json:"error,omitempty"`
 }
 
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
@@ -53,10 +54,10 @@ func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 
 func verifyNotInUse(svc *service, username string, email string) (*user, error) {
 	if u, _ := svc.users.FindByName(username); u != nil {
-		return nil, fmt.Errorf("username in use")
+		return nil, ErrExistingUsername
 	}
 	if u, _ := svc.users.FindByEmail(email); u != nil {
-		return nil, fmt.Errorf("email in use")
+		return nil, ErrExistingEmail
 	}
 	return nil, nil
 }

@@ -1,6 +1,7 @@
 package gomicroblog
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -17,26 +18,61 @@ func (suite *ServiceTestSuite) SetupTest() {
 	suite.req = registerUserRequest{"username", "password", "a@b"}
 }
 
-func (suite *ServiceTestSuite) TestExistingUsername_CannotBeReused() {
-	_, err := suite.svc.RegisterNewUser(suite.req)
-	userID, err := suite.svc.RegisterNewUser(registerUserRequest{"username", "password1", "b@c"})
+func TestService_RegisterNewUser(t *testing.T) {
+	svc := service{users: NewUserRepository()}
+	req := registerUserRequest{"username", "password", "a@b"}
+	tests := []struct {
+		req          *registerUserRequest
+		wantIDMinLen int
+		wantErr      error
+	}{
+		{
+			&registerUserRequest{
+				"username",
+				"password1",
+				"b@c",
+			},
+			-1,
+			ErrExistingUsername,
+		},
+		{
+			&registerUserRequest{
+				"username2",
+				"password1",
+				"a@b",
+			},
+			-1,
+			ErrExistingEmail,
+		},
+		{
+			&registerUserRequest{
+				"username2",
+				"passwod",
+				"b@c",
+			},
+			-1,
+			ErrInvalidPassword,
+		},
+		{
+			&registerUserRequest{
+				"username2",
+				"password",
+				"b@c.com",
+			},
+			5,
+			nil,
+		},
+	}
 
-	assert.Equal(suite.T(), "", string(userID))
-	assert.NotNil(suite.T(), err)
-}
+	for kk, tt := range tests {
+		t.Run(fmt.Sprintf("%d", kk), func(t *testing.T) {
+			_, err := svc.RegisterNewUser(req)
+			userID, err := svc.RegisterNewUser(*tt.req)
 
-func (suite *ServiceTestSuite) TestExistingEmail_CannotBeReused() {
-	_, err := suite.svc.RegisterNewUser(suite.req)
-	userID, err := suite.svc.RegisterNewUser(registerUserRequest{"username2", "password1", "a@b"})
-
-	assert.Equal(suite.T(), "", string(userID))
-	assert.NotNil(suite.T(), err)
-}
-
-func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserANewID() {
-	userID, _ := suite.svc.RegisterNewUser(suite.req)
-
-	assert.Greater(suite.T(), len(userID), 2)
+			assert.Greater(t, len(string(userID)), tt.wantIDMinLen)
+			assert.Equal(t, tt.wantErr, err)
+		})
+	}
 }
 
 func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() {
@@ -46,12 +82,6 @@ func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() 
 
 	assert.Nil(suite.T(), err)
 	assert.True(suite.T(), checkPasswordHash(user.password, "password"))
-}
-
-func (suite *ServiceTestSuite) TestPasswordLength_MustBeAtLeastEight() {
-	_, err := suite.svc.RegisterNewUser(registerUserRequest{"username2", "passwod", "b@c"})
-
-	assert.Error(suite.T(), err)
 }
 
 func (suite *ServiceTestSuite) TestNewService() {
