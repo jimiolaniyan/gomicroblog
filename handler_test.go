@@ -2,9 +2,11 @@ package gomicroblog
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -78,9 +80,68 @@ func (suite *HandlerTestSuite) TestHandlerReturnsEncodedResponse() {
 	}
 
 	json.NewDecoder(w.Body).Decode(&res)
-	fmt.Println(res.ID)
 	assert.Equal(suite.T(), http.StatusOK, w.Code)
 	assert.Greater(suite.T(), len(res.ID), 3)
+}
+
+func (suite *HandlerTestSuite) TestHandlerResponses() {
+	svc := &service{users: NewUserRepository()}
+	tests := []struct {
+		url, method          string
+		req                  io.Reader
+		handler              http.Handler
+		wantCode, wantMinLen int
+		wantErr              error
+	}{
+		{
+			"/users/v1/new",
+			http.MethodPost,
+			strings.NewReader(suite.registerReq),
+			RegisterUserHandler(svc),
+			http.StatusOK,
+			3,
+			errors.New(""),
+		},
+		{
+			"/users/v1/new",
+			http.MethodPost,
+			strings.NewReader(`invalid request`),
+			RegisterUserHandler(svc),
+			http.StatusBadRequest,
+			-1,
+			errors.New(""),
+		},
+		{
+			"/users/v1/new",
+			http.MethodPost,
+			strings.NewReader(`{"username": "", "password": "pass"}`),
+			RegisterUserHandler(svc),
+			http.StatusUnprocessableEntity,
+			-1,
+			ErrEmptyUserName,
+		},
+	}
+
+	for _, tt := range tests {
+		r, err := http.NewRequest(tt.method, tt.url, tt.req)
+		assert.Nil(suite.T(), err)
+
+		w := httptest.NewRecorder()
+		handler := http.NewServeMux()
+		handler.Handle(tt.url, tt.handler)
+		handler.ServeHTTP(w, r)
+
+		var res struct {
+			ID  ID     `json:"id,omitempty"`
+			Err string `json:"err,omitempty"`
+		}
+
+		json.NewDecoder(w.Body).Decode(&res)
+		fmt.Println(res)
+		assert.Equal(suite.T(), tt.wantCode, w.Code)
+		assert.Equal(suite.T(), tt.wantErr.Error(), res.Err)
+		assert.Greater(suite.T(), len(res.ID), tt.wantMinLen)
+	}
 }
 
 type ServiceSpy struct {

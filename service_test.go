@@ -1,6 +1,7 @@
 package gomicroblog
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -17,7 +18,9 @@ func (suite *ServiceTestSuite) SetupTest() {
 	suite.req = registerUserRequest{"username", "password", "a@b"}
 }
 
-func (suite *ServiceTestSuite) TestService_RegisterNewUser() {
+func TestService_RegisterNewUser(t *testing.T) {
+	svc := service{users: NewUserRepository()}
+	req := registerUserRequest{"username", "password", "a@b"}
 	tests := []struct {
 		req     *registerUserRequest
 		wantID  string
@@ -30,7 +33,7 @@ func (suite *ServiceTestSuite) TestService_RegisterNewUser() {
 				"b@c",
 			},
 			wantID:  "",
-			wantErr: ErrExistingUsernameOrEmail,
+			wantErr: ErrExistingUsername,
 		},
 		{
 			req: &registerUserRequest{
@@ -39,16 +42,18 @@ func (suite *ServiceTestSuite) TestService_RegisterNewUser() {
 				"a@b",
 			},
 			wantID:  "",
-			wantErr: ErrExistingUsernameOrEmail,
+			wantErr: ErrExistingEmail,
 		},
 	}
 
-	for _, tt := range tests {
-		_, err := suite.svc.RegisterNewUser(suite.req)
-		userID, err := suite.svc.RegisterNewUser(*tt.req)
+	for kk, tt := range tests {
+		t.Run(fmt.Sprintf("%d", kk), func(t *testing.T) {
+			_, err := svc.RegisterNewUser(req)
+			userID, err := svc.RegisterNewUser(*tt.req)
 
-		assert.Equal(suite.T(), tt.wantID, string(userID))
-		assert.Equal(suite.T(), tt.wantErr, err)
+			assert.Equal(t, tt.wantID, string(userID))
+			assert.Equal(t, tt.wantErr, err)
+		})
 	}
 }
 
