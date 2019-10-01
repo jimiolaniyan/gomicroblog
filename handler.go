@@ -2,6 +2,7 @@ package gomicroblog
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 )
 
@@ -14,15 +15,26 @@ func RegisterUserHandler(svc Service) http.Handler {
 		}
 		id, err := svc.RegisterNewUser(rm)
 		if err != nil {
-			res := struct {
-				Err string `json:"err"`
-			}{
-				Err: err.Error(),
-			}
-			w.WriteHeader(http.StatusUnprocessableEntity)
-			json.NewEncoder(w).Encode(&res)
+			encodeError(err, w)
+			return
 		}
+		w.WriteHeader(http.StatusCreated)
+		w.Header().Set("Location", fmt.Sprintf("%s/%s", r.URL.String(), id))
 		json.NewEncoder(w).Encode(&registerUserResponse{ID: id})
+	})
+}
+
+func encodeError(err error, w http.ResponseWriter) {
+	switch err {
+	case ErrExistingUsername, ErrExistingEmail:
+		w.WriteHeader(http.StatusConflict)
+	case ErrInvalidEmail, ErrInvalidPassword, ErrEmptyUserName:
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	default:
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"error": err.Error(),
 	})
 }
 
