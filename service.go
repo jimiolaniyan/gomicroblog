@@ -18,6 +18,10 @@ type registerUserRequest struct {
 	Email    string `json:"email"`
 }
 
+type validateUserReq struct {
+	Username, Password string
+}
+
 type registerUserResponse struct {
 	ID  ID    `json:"id,omitempty"`
 	Err error `json:"error,omitempty"`
@@ -47,6 +51,23 @@ func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 
 	if err = svc.users.Store(user); err != nil {
 		return "", fmt.Errorf("error saving user: %s ", err)
+	}
+
+	return user.ID, nil
+}
+
+func (svc *service) ValidateUser(req validateUserReq) (ID, error) {
+	if req.Username == "" || len(req.Password) < 8 {
+		return "", ErrInvalidCredentials
+	}
+
+	user, err := svc.users.FindByName(req.Username)
+	if err != nil {
+		return "", ErrInvalidCredentials
+	}
+
+	if !checkPasswordHash(user.password, req.Password) {
+		return "", ErrInvalidCredentials
 	}
 
 	return user.ID, nil

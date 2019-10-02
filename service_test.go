@@ -21,58 +21,76 @@ func (suite *ServiceTestSuite) SetupTest() {
 func TestService_RegisterNewUser(t *testing.T) {
 	svc := service{users: NewUserRepository()}
 	req := registerUserRequest{"username", "password", "a@b"}
+
 	tests := []struct {
-		req          *registerUserRequest
-		wantIDMinLen int
-		wantErr      error
+		description string
+		req         *registerUserRequest
+		wantValidID bool
+		wantErr     error
 	}{
 		{
-			&registerUserRequest{
-				"username",
-				"password1",
-				"b@c",
-			},
-			-1,
+			"ExistingUsername",
+			&registerUserRequest{"username", "password1", "b@c"},
+			false,
 			ErrExistingUsername,
 		},
 		{
-			&registerUserRequest{
-				"username2",
-				"password1",
-				"a@b",
-			},
-			-1,
+			"ExistingEmail",
+			&registerUserRequest{"username2", "password1", "a@b"},
+			false,
 			ErrExistingEmail,
 		},
 		{
-			&registerUserRequest{
-				"username2",
-				"passwod",
-				"b@c",
-			},
-			-1,
+			"InvalidPassword",
+			&registerUserRequest{"username2", "passwod", "b@c"},
+			false,
 			ErrInvalidPassword,
 		},
 		{
-			&registerUserRequest{
-				"username2",
-				"password",
-				"b@c.com",
-			},
-			5,
+			"ValidCredentials",
+			&registerUserRequest{"username2", "password", "b@c.com"},
+			true,
 			nil,
 		},
 	}
 
-	for kk, tt := range tests {
-		t.Run(fmt.Sprintf("%d", kk), func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s", tt.description), func(t *testing.T) {
 			_, err := svc.RegisterNewUser(req)
 			userID, err := svc.RegisterNewUser(*tt.req)
 
-			assert.Greater(t, len(string(userID)), tt.wantIDMinLen)
+			assert.Equal(t, IsValidID(string(userID)), tt.wantValidID)
 			assert.Equal(t, tt.wantErr, err)
 		})
 	}
+}
+
+func TestValidateUser(t *testing.T) {
+	svc := service{NewUserRepository()}
+	_, err := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
+	assert.Nil(t, err)
+
+	tests := []struct {
+		username, password string
+		wantErr            error
+		wantValidID        bool
+	}{
+		{"", "", ErrInvalidCredentials, false},
+		{"user", "jaiu", ErrInvalidCredentials, false},
+		{"nonexistent", "password", ErrInvalidCredentials, false},
+		{"user", "incorrect", ErrInvalidCredentials, false},
+		{"user", "password", nil, true},
+	}
+
+	for _, tt := range tests {
+		req := validateUserReq{tt.username, tt.password}
+
+		userID, err := svc.ValidateUser(req)
+
+		assert.Equal(t, tt.wantErr, err)
+		assert.Equal(t, tt.wantValidID, IsValidID(string(userID)))
+	}
+
 }
 
 func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() {

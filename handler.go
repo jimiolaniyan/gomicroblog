@@ -33,7 +33,7 @@ func encodeError(err error, w http.ResponseWriter) {
 	switch err {
 	case ErrExistingUsername, ErrExistingEmail:
 		w.WriteHeader(http.StatusConflict)
-	case ErrInvalidEmail, ErrInvalidPassword, ErrEmptyUserName:
+	case ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername:
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)

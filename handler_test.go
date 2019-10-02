@@ -67,17 +67,18 @@ func TestHandlerResponses(t *testing.T) {
 		}
 `
 	tests := []struct {
-		method, req          string
-		wantCode, wantMinLen int
-		wantErr              error
-		wantLocation         string
-		testExisting         bool
+		method, req  string
+		wantCode     int
+		wantValidID  bool
+		wantErr      error
+		wantLocation string
+		testExisting bool
 	}{
 		{
 			http.MethodPost,
 			registerReq,
 			http.StatusCreated,
-			3,
+			true,
 			errors.New(""),
 			"/v1/users",
 			false,
@@ -86,7 +87,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`invalid request`,
 			http.StatusBadRequest,
-			-1,
+			false,
 			errors.New(""),
 			"",
 			false,
@@ -95,8 +96,8 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "", "password": "pass"}`,
 			http.StatusUnprocessableEntity,
-			-1,
-			ErrEmptyUserName,
+			false,
+			ErrInvalidUsername,
 			"",
 			false,
 		},
@@ -104,7 +105,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "username", "password": "pass", "email": "a@b.com"}`,
 			http.StatusUnprocessableEntity,
-			-1,
+			false,
 			ErrInvalidPassword,
 			"",
 			false,
@@ -113,7 +114,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "username", "password": "password", "email": "ab.com"}`,
 			http.StatusUnprocessableEntity,
-			-1,
+			false,
 			ErrInvalidEmail,
 			"",
 			false,
@@ -122,7 +123,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "jimi", "password": "password", "email": "a@b.com"}`,
 			http.StatusConflict,
-			-1,
+			false,
 			ErrExistingUsername,
 			"",
 			true,
@@ -131,7 +132,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "username", "password": "password", "email": "test@tester.test"}`,
 			http.StatusConflict,
-			-1,
+			false,
 			ErrExistingEmail,
 			"",
 			true,
@@ -164,7 +165,7 @@ func TestHandlerResponses(t *testing.T) {
 			json.NewDecoder(w.Body).Decode(&res)
 			assert.Equal(t, tt.wantCode, w.Code)
 			assert.Equal(t, tt.wantErr.Error(), res.Err)
-			assert.Greater(t, len(res.ID), tt.wantMinLen)
+			assert.Equal(t, IsValidID(string(res.ID)), tt.wantValidID)
 			assert.Equal(t, w.Header().Get("Content-Type"), "application/json")
 			assert.True(t, strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
 		})
