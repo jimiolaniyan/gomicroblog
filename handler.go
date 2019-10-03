@@ -3,19 +3,20 @@ package gomicroblog
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 )
 
 func RegisterUserHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		rm, err := decodeRegisterUserRequest(r)
+		req, err := decodeRegisterUserRequest(r.Body)
 		w.Header().Set("Content-Type", "application/json")
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		id, err := svc.RegisterNewUser(rm)
+		id, err := svc.RegisterNewUser(req.(registerUserRequest))
 		if err != nil {
 			encodeError(err, w)
 			return
@@ -29,12 +30,29 @@ func RegisterUserHandler(svc Service) http.Handler {
 	})
 }
 
+func LoginHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, err := decodeValidateUserRequest(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+		_, err = svc.ValidateUser(req.(validateUserRequest))
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+	})
+}
+
 func encodeError(err error, w http.ResponseWriter) {
 	switch err {
 	case ErrExistingUsername, ErrExistingEmail:
 		w.WriteHeader(http.StatusConflict)
 	case ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername:
 		w.WriteHeader(http.StatusUnprocessableEntity)
+	case ErrInvalidCredentials:
+		w.WriteHeader(http.StatusUnauthorized)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -45,11 +63,19 @@ func encodeError(err error, w http.ResponseWriter) {
 	}
 }
 
-func decodeRegisterUserRequest(r *http.Request) (registerUserRequest, error) {
-	ur := registerUserRequest{}
-	if err := json.NewDecoder(r.Body).Decode(&ur); err != nil {
+func decodeRegisterUserRequest(body io.ReadCloser) (interface{}, error) {
+	req := registerUserRequest{}
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
 		return registerUserRequest{}, err
 	}
 
-	return ur, nil
+	return req, nil
+}
+
+func decodeValidateUserRequest(body io.ReadCloser) (interface{}, error) {
+	req := validateUserRequest{}
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return validateUserRequest{}, err
+	}
+	return req, nil
 }

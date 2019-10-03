@@ -6,6 +6,7 @@ import (
 
 type Service interface {
 	RegisterNewUser(req registerUserRequest) (ID, error)
+	ValidateUser(req validateUserRequest) (ID, error)
 }
 
 type service struct {
@@ -18,7 +19,7 @@ type registerUserRequest struct {
 	Email    string `json:"email"`
 }
 
-type validateUserReq struct {
+type validateUserRequest struct {
 	Username, Password string
 }
 
@@ -56,7 +57,7 @@ func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 	return user.ID, nil
 }
 
-func (svc *service) ValidateUser(req validateUserReq) (ID, error) {
+func (svc *service) ValidateUser(req validateUserRequest) (ID, error) {
 	if req.Username == "" || len(req.Password) < 8 {
 		return "", ErrInvalidCredentials
 	}

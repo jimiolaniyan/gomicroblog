@@ -83,7 +83,7 @@ func TestValidateUser(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		req := validateUserReq{tt.username, tt.password}
+		req := validateUserRequest{tt.username, tt.password}
 
 		userID, err := svc.ValidateUser(req)
 

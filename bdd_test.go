@@ -33,7 +33,7 @@ func TestRegisterNewUser(t *testing.T) {
 }
 
 func TestLoginUser(t *testing.T) {
-	var req validateUserReq
+	var req validateUserRequest
 	Convey("Given an existing user", t, func() {
 		svc := service{users: NewUserRepository()}
 		regReq := registerUserRequest{"user", "password", "user@app.com"}

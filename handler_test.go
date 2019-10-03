@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,28 +16,31 @@ import (
 
 type HandlerTestSuite struct {
 	suite.Suite
-	registerReq string
+	registerReq, loginReq string
 }
 
 func (suite *HandlerTestSuite) SetupTest() {
-	suite.registerReq = `
-		{
-			"username":"jimi",
-			"password":"password1",
-			"email":"test@tester.test"
-		}
-`
+	suite.registerReq = `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
+	suite.loginReq = `{"username": "jimi", "password": "password1"}`
 }
 
 func (suite *HandlerTestSuite) TestDecodeRequest() {
-	r := httptest.NewRequest(http.MethodPost, "/v1/users/new", strings.NewReader(suite.registerReq))
+	tests := []struct {
+		r       string
+		decoder func(closer io.ReadCloser) (interface{}, error)
+		wantErr error
+		wantReq interface{}
+	}{
+		{suite.registerReq, decodeRegisterUserRequest, nil, registerUserRequest{"jimi", "password1", "test@tester.test"}},
+		{suite.loginReq, decodeValidateUserRequest, nil, validateUserRequest{"jimi", "password1"}},
+	}
 
-	body, err := decodeRegisterUserRequest(r)
-
-	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), "jimi", body.Username)
-	assert.Equal(suite.T(), "password1", body.Password)
-	assert.Equal(suite.T(), "test@tester.test", body.Email)
+	for _, tt := range tests {
+		body := ioutil.NopCloser(strings.NewReader(tt.r))
+		req, err := tt.decoder(body)
+		assert.Equal(suite.T(), tt.wantErr, err)
+		assert.Equal(suite.T(), tt.wantReq, req)
+	}
 }
 
 func (suite *HandlerTestSuite) TestHandlerInvokesServiceWithRequest() {
@@ -162,7 +167,7 @@ func TestHandlerResponses(t *testing.T) {
 				Err string `json:"error,omitempty"`
 			}
 
-			json.NewDecoder(w.Body).Decode(&res)
+			_ = json.NewDecoder(w.Body).Decode(&res)
 			assert.Equal(t, tt.wantCode, w.Code)
 			assert.Equal(t, tt.wantErr.Error(), res.Err)
 			assert.Equal(t, IsValidID(string(res.ID)), tt.wantValidID)
@@ -172,9 +177,42 @@ func TestHandlerResponses(t *testing.T) {
 	}
 }
 
+func TestLoginHandler(t *testing.T) {
+	svc := NewService(NewUserRepository())
+	_, _ = svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
+
+	tests := []struct {
+		description, req string
+		wantCode         int
+	}{
+		{"BadRequest", `invalid request`, http.StatusBadRequest},
+		{"NonExistentUser", `{"username": "nonexistent", "password": "password"}`, http.StatusUnauthorized},
+		{"ExistingUserWithInvalidPassword", `{"username": "user", "password": "anInvalid"}`, http.StatusUnauthorized},
+		{"ExistingUserWithValidPassword", `{"username": "user", "password": "password"}`, http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(tt.req))
+			assert.Nil(t, err)
+
+			w := httptest.NewRecorder()
+			mux := http.NewServeMux()
+			mux.Handle("/v1/auth/login", LoginHandler(svc))
+			mux.ServeHTTP(w, req)
+			assert.Equal(t, tt.wantCode, w.Code)
+		})
+	}
+
+}
+
 type ServiceSpy struct {
 	registerNewUserWasCalled bool
 	request                  registerUserRequest
+}
+
+func (s *ServiceSpy) ValidateUser(req validateUserRequest) (ID, error) {
+	return "", nil
 }
 
 func (s *ServiceSpy) RegisterNewUser(req registerUserRequest) (ID, error) {
