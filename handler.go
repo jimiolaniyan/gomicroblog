@@ -37,6 +37,7 @@ func LoginHandler(svc Service) http.Handler {
 		w.Header().Set("Content-Type", "application/json")
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		userID, err := svc.ValidateUser(req.(validateUserRequest))
 		if err != nil {
