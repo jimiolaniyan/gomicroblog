@@ -3,6 +3,7 @@ package gomicroblog
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"io"
 	"net/http"
 	"strings"
@@ -37,12 +38,23 @@ func LoginHandler(svc Service) http.Handler {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 		}
-		_, err = svc.ValidateUser(req.(validateUserRequest))
+		userID, err := svc.ValidateUser(req.(validateUserRequest))
 		if err != nil {
 			encodeError(err, w)
 			return
 		}
+
+		tokenString, err := getJWTToken(string(userID))
+		if err = json.NewEncoder(w).Encode(map[string]interface{}{"token": tokenString}); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	})
+}
+
+func getJWTToken(id string) (string, error) {
+	key := []byte("e624d92e3fa438b6a8fac4f698e977cd")
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{Issuer: "auth", Subject: id})
+	return token.SignedString(key)
 }
 
 func encodeError(err error, w http.ResponseWriter) {

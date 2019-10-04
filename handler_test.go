@@ -1,6 +1,7 @@
 package gomicroblog
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -179,16 +180,17 @@ func TestHandlerResponses(t *testing.T) {
 
 func TestLoginHandler(t *testing.T) {
 	svc := NewService(NewUserRepository())
-	_, _ = svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
+	userID, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
 
 	tests := []struct {
-		description, req string
-		wantCode         int
+		description, req       string
+		wantCode, wantTokenLen int
+		wantClaims             string
 	}{
-		{"BadRequest", `invalid request`, http.StatusBadRequest},
-		{"NonExistentUser", `{"username": "nonexistent", "password": "password"}`, http.StatusUnauthorized},
-		{"ExistingUserWithInvalidPassword", `{"username": "user", "password": "anInvalid"}`, http.StatusUnauthorized},
-		{"ExistingUserWithValidPassword", `{"username": "user", "password": "password"}`, http.StatusOK},
+		{"BadRequest", `invalid request`, http.StatusBadRequest, 1, ""},
+		{"NonExistentUser", `{"username": "nonexistent", "password": "password"}`, http.StatusUnauthorized, 1, ""},
+		{"ExistingUserWithInvalidPassword", `{"username": "user", "password": "anInvalid"}`, http.StatusUnauthorized, 1, ""},
+		{"ExistingUserWithValidPassword", `{"username": "user", "password": "password"}`, http.StatusOK, 3, fmt.Sprintf("{\"iss\":\"auth\",\"sub\":\"%s\"}", userID)},
 	}
 
 	for _, tt := range tests {
@@ -200,10 +202,24 @@ func TestLoginHandler(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.Handle("/v1/auth/login", LoginHandler(svc))
 			mux.ServeHTTP(w, req)
+
+			var res struct {
+				Token string `json:"token,omitempty"`
+				Error string `json:"error,omitempty"`
+			}
+
+			_ = json.NewDecoder(w.Body).Decode(&res)
 			assert.Equal(t, tt.wantCode, w.Code)
+			parts := strings.Split(res.Token, ".")
+			assert.Equal(t, len(parts), tt.wantTokenLen)
+
+			if len(parts) > 2 {
+				claim, err := base64.RawStdEncoding.DecodeString(parts[1])
+				assert.Nil(t, err)
+				assert.Equal(t, tt.wantClaims, string(claim))
+			}
 		})
 	}
-
 }
 
 type ServiceSpy struct {
