@@ -58,3 +58,36 @@ func TestLoginUser(t *testing.T) {
 		})
 	})
 }
+
+func TestPostCreation(t *testing.T) {
+	Convey("Given a registered user U", t, func() {
+		svc := NewService(NewUserRepository(), NewPostRepository())
+		userID, err := svc.RegisterNewUser(registerUserRequest{"U", "password", "user@app.com"})
+		So(err, ShouldBeNil)
+		So(IsValidID(string(userID)), ShouldBeTrue)
+
+		Convey("With a new post P", nil)
+		body := "P"
+
+		Convey("When U creates P", func() {
+			postId, err := svc.CreatePost(userID, body)
+			So(err, ShouldBeNil)
+			So(IsValidID(string(postId)), ShouldBeTrue)
+
+			Convey("Then the user's posts will contain P", func() {
+				posts, _ := svc.GetUserPosts(userID)
+				var p *post
+
+				for _, post := range posts {
+					if post.UserID == userID {
+						p = post
+					}
+				}
+
+				So(p, ShouldNotBeNil)
+				So(postId, ShouldEqual, p.ID)
+				So(body, ShouldEqual, p.body)
+			})
+		})
+	})
+}

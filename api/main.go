@@ -8,7 +8,7 @@ import (
 
 func main() {
 	users := blog.NewUserRepository()
-	svc := blog.NewService(users)
+	svc := blog.NewService(users, nil)
 
 	mux := http.NewServeMux()
 	mux.Handle("/v1/users/new", blog.RegisterUserHandler(svc))

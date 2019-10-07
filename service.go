@@ -1,16 +1,21 @@
 package gomicroblog
 
 import (
+	"errors"
 	"fmt"
+	"github.com/rs/xid"
 )
 
 type Service interface {
 	RegisterNewUser(req registerUserRequest) (ID, error)
 	ValidateUser(req validateUserRequest) (ID, error)
+	CreatePost(id ID, body string) (PostID, error)
+	GetUserPosts(id ID) ([]*post, error)
 }
 
 type service struct {
 	users Repository
+	posts PostRepository
 }
 
 type registerUserRequest struct {
@@ -84,6 +89,36 @@ func verifyNotInUse(svc *service, username string, email string) (*user, error) 
 	return nil, nil
 }
 
-func NewService(repo Repository) Service {
-	return &service{users: repo}
+func (svc *service) CreatePost(id ID, body string) (PostID, error) {
+	if !IsValidID(string(id)) {
+		return "", ErrInvalidID
+	}
+	_, err := svc.users.FindByID(id)
+	if err != nil {
+		return "", err
+	}
+
+	post, err := NewPost(id, body)
+	if err != nil {
+		return "", err
+	}
+
+	post.ID = PostID(xid.New().String())
+	if err = svc.posts.Store(post); err != nil {
+		return "", errors.New("error saving post")
+	}
+
+	return post.ID, nil
+}
+
+func (svc *service) GetUserPosts(id ID) ([]*post, error) {
+	if !IsValidID(string(id)) {
+		return []*post{}, ErrInvalidID
+	}
+
+	return svc.posts.FindByUserID(id)
+}
+
+func NewService(users Repository, posts PostRepository) Service {
+	return &service{users: users, posts: posts}
 }

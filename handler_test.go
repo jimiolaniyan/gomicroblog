@@ -153,7 +153,7 @@ func TestHandlerResponses(t *testing.T) {
 }
 
 func TestLoginHandler(t *testing.T) {
-	svc := NewService(NewUserRepository())
+	svc := NewService(NewUserRepository(), nil)
 	userID, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
 
 	tests := []struct {
