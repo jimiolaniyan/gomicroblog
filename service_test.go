@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
+	"time"
 )
 
 type ServiceTestSuite struct {
@@ -96,18 +97,20 @@ func TestCreatePost(t *testing.T) {
 	svc := NewService(NewUserRepository(), NewPostRepository())
 	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "e@mail.com"})
 	tests := []struct {
-		userID      ID
-		body        string
-		wantValidID bool
-		wantErr     error
+		userID        ID
+		body          string
+		wantValidID   bool
+		wantErr       error
+		wantTimeStamp bool
 	}{
-		{"", "", false, ErrInvalidID},
-		{"user", "", false, ErrInvalidID},
-		{nextID(), "post", false, ErrNotFound},
-		{id, "", false, ErrEmptyBody},
-		{id, "post", true, nil},
+		{"", "", false, ErrInvalidID, false},
+		{"user", "", false, ErrInvalidID, false},
+		{nextID(), "post", false, ErrNotFound, false},
+		{id, "", false, ErrEmptyBody, false},
+		{id, "post", true, nil, true},
 	}
 	for _, tt := range tests {
+		ts := time.Now()
 		id, err := svc.CreatePost(tt.userID, tt.body)
 		assert.Equal(t, tt.wantValidID, IsValidID(string(id)))
 		assert.Equal(t, tt.wantErr, err)
@@ -117,6 +120,7 @@ func TestCreatePost(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, tt.body, post.body)
 			assert.Equal(t, tt.userID, post.UserID)
+			assert.Equal(t, tt.wantTimeStamp, post.timestamp.After(ts))
 		}
 	}
 }
