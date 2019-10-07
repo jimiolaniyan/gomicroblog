@@ -1,6 +1,7 @@
 package gomicroblog
 
 import (
+	"github.com/rs/xid"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -19,7 +20,7 @@ func TestNewUser(t *testing.T) {
 		wantErr         error
 		wantUser        *user
 	}{
-		{"", "", ErrEmptyUserName, nil},
+		{"", "", ErrInvalidUsername, nil},
 		{"username", "", ErrInvalidEmail, nil},
 		{"username", "email", ErrInvalidEmail, nil},
 		{"user", "email@email.com", nil, &user{username: "user", email: "email@email.com"}},
@@ -29,5 +30,24 @@ func TestNewUser(t *testing.T) {
 		user, err := NewUser(tt.username, tt.email)
 		assert.Equal(t, tt.wantErr, err)
 		assert.Equal(t, tt.wantUser, user)
+	}
+}
+
+func TestValidID(t *testing.T) {
+	tests := []struct {
+		id   string
+		want bool
+	}{
+		{id: "", want: false},
+		{id: "egegeg", want: false},
+		{id: "egege84g9f8dw9f929d9", want: false},
+		{id: xid.New().String(), want: true},
+	}
+
+	for _, tt := range tests {
+		v := IsValidID(tt.id)
+		if tt.want != v {
+			t.Errorf("Test failed; want %t, got %t", tt.want, v)
+		}
 	}
 }

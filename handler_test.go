@@ -1,58 +1,38 @@
 package gomicroblog
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-type HandlerTestSuite struct {
-	suite.Suite
-	registerReq string
-}
+func TestDecodeRequest(t *testing.T) {
+	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
+	loginReq := `{"username": "jimi", "password": "password1"}`
+	tests := []struct {
+		r       string
+		decoder func(closer io.ReadCloser) (interface{}, error)
+		wantErr error
+		wantReq interface{}
+	}{
+		{registerReq, decodeRegisterUserRequest, nil, registerUserRequest{"jimi", "password1", "test@tester.test"}},
+		{loginReq, decodeValidateUserRequest, nil, validateUserRequest{"jimi", "password1"}},
+	}
 
-func (suite *HandlerTestSuite) SetupTest() {
-	suite.registerReq = `
-		{
-			"username":"jimi",
-			"password":"password1",
-			"email":"test@tester.test"
-		}
-`
-}
-
-func (suite *HandlerTestSuite) TestDecodeRequest() {
-	r := httptest.NewRequest(http.MethodPost, "/v1/users/new", strings.NewReader(suite.registerReq))
-
-	body, err := decodeRegisterUserRequest(r)
-
-	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), "jimi", body.Username)
-	assert.Equal(suite.T(), "password1", body.Password)
-	assert.Equal(suite.T(), "test@tester.test", body.Email)
-}
-
-func (suite *HandlerTestSuite) TestHandlerInvokesServiceWithRequest() {
-	r, err := http.NewRequest(http.MethodPost, "/v1/users/new", strings.NewReader(suite.registerReq))
-	assert.Nil(suite.T(), err)
-
-	svc := &ServiceSpy{}
-
-	w := httptest.NewRecorder()
-	handler := http.NewServeMux()
-	handler.Handle("/v1/users/new", RegisterUserHandler(svc))
-	handler.ServeHTTP(w, r)
-
-	assert.True(suite.T(), svc.registerNewUserWasCalled)
-	assert.Equal(suite.T(), "jimi", svc.request.Username)
-	assert.Equal(suite.T(), "password1", svc.request.Password)
-	assert.Equal(suite.T(), "test@tester.test", svc.request.Email)
+	for _, tt := range tests {
+		body := ioutil.NopCloser(strings.NewReader(tt.r))
+		req, err := tt.decoder(body)
+		assert.Equal(t, tt.wantErr, err)
+		assert.Equal(t, tt.wantReq, req)
+	}
 }
 
 func TestHandlerResponses(t *testing.T) {
@@ -67,17 +47,18 @@ func TestHandlerResponses(t *testing.T) {
 		}
 `
 	tests := []struct {
-		method, req          string
-		wantCode, wantMinLen int
-		wantErr              error
-		wantLocation         string
-		testExisting         bool
+		method, req  string
+		wantCode     int
+		wantValidID  bool
+		wantErr      error
+		wantLocation string
+		testExisting bool
 	}{
 		{
 			http.MethodPost,
 			registerReq,
 			http.StatusCreated,
-			3,
+			true,
 			errors.New(""),
 			"/v1/users",
 			false,
@@ -86,7 +67,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`invalid request`,
 			http.StatusBadRequest,
-			-1,
+			false,
 			errors.New(""),
 			"",
 			false,
@@ -95,8 +76,8 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "", "password": "pass"}`,
 			http.StatusUnprocessableEntity,
-			-1,
-			ErrEmptyUserName,
+			false,
+			ErrInvalidUsername,
 			"",
 			false,
 		},
@@ -104,7 +85,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "username", "password": "pass", "email": "a@b.com"}`,
 			http.StatusUnprocessableEntity,
-			-1,
+			false,
 			ErrInvalidPassword,
 			"",
 			false,
@@ -113,7 +94,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "username", "password": "password", "email": "ab.com"}`,
 			http.StatusUnprocessableEntity,
-			-1,
+			false,
 			ErrInvalidEmail,
 			"",
 			false,
@@ -122,7 +103,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "jimi", "password": "password", "email": "a@b.com"}`,
 			http.StatusConflict,
-			-1,
+			false,
 			ErrExistingUsername,
 			"",
 			true,
@@ -131,7 +112,7 @@ func TestHandlerResponses(t *testing.T) {
 			http.MethodPost,
 			`{"username": "username", "password": "password", "email": "test@tester.test"}`,
 			http.StatusConflict,
-			-1,
+			false,
 			ErrExistingEmail,
 			"",
 			true,
@@ -161,27 +142,56 @@ func TestHandlerResponses(t *testing.T) {
 				Err string `json:"error,omitempty"`
 			}
 
-			json.NewDecoder(w.Body).Decode(&res)
+			_ = json.NewDecoder(w.Body).Decode(&res)
 			assert.Equal(t, tt.wantCode, w.Code)
 			assert.Equal(t, tt.wantErr.Error(), res.Err)
-			assert.Greater(t, len(res.ID), tt.wantMinLen)
+			assert.Equal(t, IsValidID(string(res.ID)), tt.wantValidID)
 			assert.Equal(t, w.Header().Get("Content-Type"), "application/json")
 			assert.True(t, strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
 		})
 	}
 }
 
-type ServiceSpy struct {
-	registerNewUserWasCalled bool
-	request                  registerUserRequest
-}
+func TestLoginHandler(t *testing.T) {
+	svc := NewService(NewUserRepository())
+	userID, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
 
-func (s *ServiceSpy) RegisterNewUser(req registerUserRequest) (ID, error) {
-	s.registerNewUserWasCalled = true
-	s.request = req
-	return "", nil
-}
+	tests := []struct {
+		description, req       string
+		wantCode, wantTokenLen int
+		wantClaims             string
+	}{
+		{"BadRequest", `invalid request`, http.StatusBadRequest, 1, ""},
+		{"NonExistentUser", `{"username": "nonexistent", "password": "password"}`, http.StatusUnauthorized, 1, ""},
+		{"ExistingUserWithInvalidPassword", `{"username": "user", "password": "anInvalid"}`, http.StatusUnauthorized, 1, ""},
+		{"ExistingUserWithValidPassword", `{"username": "user", "password": "password"}`, http.StatusOK, 3, fmt.Sprintf("{\"iss\":\"auth\",\"sub\":\"%s\"}", userID)},
+	}
 
-func TestHandlerSuite(t *testing.T) {
-	suite.Run(t, new(HandlerTestSuite))
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(tt.req))
+			assert.Nil(t, err)
+
+			w := httptest.NewRecorder()
+			mux := http.NewServeMux()
+			mux.Handle("/v1/auth/login", LoginHandler(svc))
+			mux.ServeHTTP(w, req)
+
+			var res struct {
+				Token string `json:"token,omitempty"`
+				Error string `json:"error,omitempty"`
+			}
+
+			_ = json.NewDecoder(w.Body).Decode(&res)
+			assert.Equal(t, tt.wantCode, w.Code)
+			parts := strings.Split(res.Token, ".")
+			assert.Equal(t, len(parts), tt.wantTokenLen)
+
+			if len(parts) > 2 {
+				claim, err := base64.RawStdEncoding.DecodeString(parts[1])
+				assert.Nil(t, err)
+				assert.Equal(t, tt.wantClaims, string(claim))
+			}
+		})
+	}
 }

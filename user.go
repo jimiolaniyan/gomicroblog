@@ -26,12 +26,13 @@ type user struct {
 }
 
 var (
-	ErrNotFound         = errors.New("user not found")
-	ErrEmptyUserName    = errors.New("username cannot be empty")
-	ErrInvalidPassword  = errors.New("invalid password")
-	ErrInvalidEmail     = errors.New("invalid email address")
-	ErrExistingUsername = errors.New("username in use")
-	ErrExistingEmail    = errors.New("email in use")
+	ErrNotFound           = errors.New("user not found")
+	ErrInvalidUsername    = errors.New("invalid username")
+	ErrInvalidPassword    = errors.New("invalid password")
+	ErrInvalidEmail       = errors.New("invalid email address")
+	ErrExistingUsername   = errors.New("username in use")
+	ErrExistingEmail      = errors.New("email in use")
+	ErrInvalidCredentials = errors.New("invalid username or password")
 )
 
 func NewUser(username, email string) (*user, error) {
@@ -44,7 +45,7 @@ func NewUser(username, email string) (*user, error) {
 
 func validateArgs(username string, email string) error {
 	if len(username) < 1 {
-		return ErrEmptyUserName
+		return ErrInvalidUsername
 	}
 
 	if !strings.Contains(email, "@") {
@@ -56,6 +57,14 @@ func validateArgs(username string, email string) error {
 
 func nextID() ID {
 	return ID(xid.New().String())
+}
+
+//IsValidID checks if a given id is valid based on the xid library
+func IsValidID(id string) bool {
+	if _, err := xid.FromString(id); err == xid.ErrInvalidID {
+		return false
+	}
+	return true
 }
 
 func hashPassword(password string) (string, error) {

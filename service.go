@@ -6,6 +6,7 @@ import (
 
 type Service interface {
 	RegisterNewUser(req registerUserRequest) (ID, error)
+	ValidateUser(req validateUserRequest) (ID, error)
 }
 
 type service struct {
@@ -16,6 +17,10 @@ type registerUserRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 	Email    string `json:"email"`
+}
+
+type validateUserRequest struct {
+	Username, Password string
 }
 
 type registerUserResponse struct {
@@ -47,6 +52,23 @@ func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 
 	if err = svc.users.Store(user); err != nil {
 		return "", fmt.Errorf("error saving user: %s ", err)
+	}
+
+	return user.ID, nil
+}
+
+func (svc *service) ValidateUser(req validateUserRequest) (ID, error) {
+	if req.Username == "" || len(req.Password) < 8 {
+		return "", ErrInvalidCredentials
+	}
+
+	user, err := svc.users.FindByName(req.Username)
+	if err != nil {
+		return "", ErrInvalidCredentials
+	}
+
+	if !checkPasswordHash(user.password, req.Password) {
+		return "", ErrInvalidCredentials
 	}
 
 	return user.ID, nil
