@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+type key string
+
+const idKey = key("auth")
+
 func RegisterUserHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req, err := decodeRegisterUserRequest(r.Body)
@@ -52,6 +56,28 @@ func LoginHandler(svc Service) http.Handler {
 	})
 }
 
+func CreatePostHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		request, err := decodeCreatePostRequest(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// TODO add test for 500 when there is no key in context
+		id := r.Context().Value(idKey).(string)
+		req := request.(createPostRequest)
+		_, err = svc.CreatePost(ID(id), req.Body)
+
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+	})
+}
+
 func getJWTToken(id string) (string, error) {
 	key := []byte("e624d92e3fa438b6a8fac4f698e977cd")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{Issuer: "auth", Subject: id})
@@ -62,9 +88,9 @@ func encodeError(err error, w http.ResponseWriter) {
 	switch err {
 	case ErrExistingUsername, ErrExistingEmail:
 		w.WriteHeader(http.StatusConflict)
-	case ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername:
+	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername:
 		w.WriteHeader(http.StatusUnprocessableEntity)
-	case ErrInvalidCredentials:
+	case ErrInvalidCredentials, ErrInvalidID:
 		w.WriteHeader(http.StatusUnauthorized)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
@@ -89,6 +115,14 @@ func decodeValidateUserRequest(body io.ReadCloser) (interface{}, error) {
 	req := validateUserRequest{}
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
 		return validateUserRequest{}, err
+	}
+	return req, nil
+}
+
+func decodeCreatePostRequest(body io.ReadCloser) (interface{}, error) {
+	req := createPostRequest{}
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return createPostRequest{}, err
 	}
 	return req, nil
 }

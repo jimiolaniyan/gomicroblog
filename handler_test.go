@@ -1,6 +1,7 @@
 package gomicroblog
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,7 @@ import (
 func TestDecodeRequest(t *testing.T) {
 	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
 	loginReq := `{"username": "jimi", "password": "password1"}`
+	createPostReq := `{"body": "a simple post"}`
 	tests := []struct {
 		r       string
 		decoder func(closer io.ReadCloser) (interface{}, error)
@@ -25,6 +27,7 @@ func TestDecodeRequest(t *testing.T) {
 	}{
 		{registerReq, decodeRegisterUserRequest, nil, registerUserRequest{"jimi", "password1", "test@tester.test"}},
 		{loginReq, decodeValidateUserRequest, nil, validateUserRequest{"jimi", "password1"}},
+		{createPostReq, decodeCreatePostRequest, nil, createPostRequest{"a simple post"}},
 	}
 
 	for _, tt := range tests {
@@ -194,4 +197,45 @@ func TestLoginHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreatePostHandler(t *testing.T) {
+	svc := NewService(NewUserRepository(), NewPostRepository())
+	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
+
+	tests := []struct {
+		req, userID string
+		wantCode    int
+		wantErr     error
+		wantID      bool
+	}{
+		{`invalid request`, "", http.StatusBadRequest, errors.New(""), false},
+		{`{"body": ""}`, "", http.StatusUnauthorized, ErrInvalidID, false},
+		{`{"body": ""}`, "puoiwoerigp", http.StatusUnauthorized, ErrInvalidID, false},
+		{`{"body": ""}`, string(id), http.StatusUnprocessableEntity, ErrEmptyBody, false},
+		{`{"body": "i love my wife :)"}`, string(id), http.StatusCreated, errors.New(""), true},
+	}
+
+	for _, tt := range tests {
+		r, _ := http.NewRequest(http.MethodPost, "/v1/posts", strings.NewReader(tt.req))
+
+		w := httptest.NewRecorder()
+		mux := http.NewServeMux()
+		mux.Handle("/v1/posts", CreatePostHandler(svc))
+
+		ctx := context.WithValue(r.Context(), idKey, tt.userID)
+		mux.ServeHTTP(w, r.WithContext(ctx))
+
+		var res struct {
+			ID  PostID `json:"id,omitempty"`
+			Err string `json:"error,omitempty"`
+		}
+
+		_ = json.NewDecoder(w.Body).Decode(&res)
+
+		assert.Equal(t, tt.wantCode, w.Code)
+		assert.Equal(t, tt.wantErr.Error(), res.Err)
+		assert.Equal(t, IsValidID(string(res.ID)), tt.wantID)
+	}
+
 }

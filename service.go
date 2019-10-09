@@ -28,6 +28,10 @@ type validateUserRequest struct {
 	Username, Password string
 }
 
+type createPostRequest struct {
+	Body string
+}
+
 type registerUserResponse struct {
 	ID  ID    `json:"id,omitempty"`
 	Err error `json:"error,omitempty"`
