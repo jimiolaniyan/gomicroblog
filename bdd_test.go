@@ -75,11 +75,11 @@ func TestPostCreation(t *testing.T) {
 			So(IsValidID(string(postId)), ShouldBeTrue)
 
 			Convey("Then the user's posts will contain P", func() {
-				posts, _ := svc.GetUserPosts(userID)
+				posts, _ := svc.GetUserPosts("U")
 				var p *post
 
 				for _, post := range posts {
-					if post.Author.UserID == userID {
+					if post.Author.Username == "U" {
 						p = post
 					}
 				}

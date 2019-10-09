@@ -13,7 +13,7 @@ var (
 type PostRepository interface {
 	FindByID(id PostID) (*post, error)
 	Store(post *post) error
-	FindByUserID(id ID) ([]*post, error)
+	FindByName(username string) ([]*post, error)
 }
 
 type PostID string

@@ -10,7 +10,7 @@ type Service interface {
 	RegisterNewUser(req registerUserRequest) (ID, error)
 	ValidateUser(req validateUserRequest) (ID, error)
 	CreatePost(id ID, body string) (PostID, error)
-	GetUserPosts(id ID) ([]*post, error)
+	GetUserPosts(username string) ([]*post, error)
 }
 
 type service struct {
@@ -121,12 +121,12 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 	return post.ID, nil
 }
 
-func (svc *service) GetUserPosts(id ID) ([]*post, error) {
-	if !IsValidID(string(id)) {
-		return []*post{}, ErrInvalidID
+func (svc *service) GetUserPosts(username string) ([]*post, error) {
+	if username == "" {
+		return []*post{}, ErrInvalidUsername
 	}
 
-	return svc.posts.FindByUserID(id)
+	return svc.posts.FindByName(username)
 }
 
 func NewService(users Repository, posts PostRepository) Service {

@@ -132,16 +132,16 @@ func TestGetUserPosts(t *testing.T) {
 	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "e@mail.com"})
 	_, _ = svc.CreatePost(id, "body")
 	tests := []struct {
-		userID       ID
+		username     string
 		wantErr      error
 		wantPostsLen int
 	}{
-		{"", ErrInvalidID, 0},
-		{id, nil, 1},
+		{"", ErrInvalidUsername, 0},
+		{"user", nil, 1},
 	}
 
 	for _, tt := range tests {
-		posts, err := svc.GetUserPosts(tt.userID)
+		posts, err := svc.GetUserPosts(tt.username)
 		assert.Equal(t, tt.wantErr, err)
 		assert.Equal(t, tt.wantPostsLen, len(posts))
 	}

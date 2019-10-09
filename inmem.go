@@ -54,10 +54,10 @@ func (repo *postRepository) FindByID(id PostID) (*post, error) {
 	return nil, ErrPostNotFound
 }
 
-func (repo *postRepository) FindByUserID(id ID) ([]*post, error) {
+func (repo *postRepository) FindByName(username string) ([]*post, error) {
 	var posts []*post
 	for _, p := range repo.posts {
-		if p.Author.UserID == id {
+		if p.Author.Username == username {
 			posts = append(posts, p)
 		}
 	}
