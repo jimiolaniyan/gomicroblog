@@ -65,16 +65,21 @@ func CreatePostHandler(svc Service) http.Handler {
 			return
 		}
 		// TODO add test for 500 when there is no key in context
-		id := r.Context().Value(idKey).(string)
+		userID := r.Context().Value(idKey).(string)
 		req := request.(createPostRequest)
-		_, err = svc.CreatePost(ID(id), req.Body)
+		postId, err := svc.CreatePost(ID(userID), req.Body)
 
 		if err != nil {
 			encodeError(err, w)
 			return
 		}
 
+		location := strings.Join(strings.Split(r.URL.Path, "/")[0:3], "/")
+		w.Header().Set("Location", fmt.Sprintf("%s/%s", location, postId))
 		w.WriteHeader(http.StatusCreated)
+		if err := json.NewEncoder(w).Encode(&createPostResponse{ID: postId}); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	})
 }
 

@@ -204,16 +204,17 @@ func TestCreatePostHandler(t *testing.T) {
 	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
 
 	tests := []struct {
-		req, userID string
-		wantCode    int
-		wantErr     error
-		wantID      bool
+		req, userID  string
+		wantCode     int
+		wantErr      error
+		wantID       bool
+		wantLocation string
 	}{
-		{`invalid request`, "", http.StatusBadRequest, errors.New(""), false},
-		{`{"body": ""}`, "", http.StatusUnauthorized, ErrInvalidID, false},
-		{`{"body": ""}`, "puoiwoerigp", http.StatusUnauthorized, ErrInvalidID, false},
-		{`{"body": ""}`, string(id), http.StatusUnprocessableEntity, ErrEmptyBody, false},
-		{`{"body": "i love my wife :)"}`, string(id), http.StatusCreated, errors.New(""), true},
+		{`invalid request`, "", http.StatusBadRequest, errors.New(""), false, ""},
+		{`{"body": ""}`, "", http.StatusUnauthorized, ErrInvalidID, false, ""},
+		{`{"body": ""}`, "puoiwoerigp", http.StatusUnauthorized, ErrInvalidID, false, ""},
+		{`{"body": ""}`, string(id), http.StatusUnprocessableEntity, ErrEmptyBody, false, ""},
+		{`{"body": "i love my wife :)"}`, string(id), http.StatusCreated, errors.New(""), true, "/v1/posts"},
 	}
 
 	for _, tt := range tests {
@@ -236,6 +237,7 @@ func TestCreatePostHandler(t *testing.T) {
 		assert.Equal(t, tt.wantCode, w.Code)
 		assert.Equal(t, tt.wantErr.Error(), res.Err)
 		assert.Equal(t, IsValidID(string(res.ID)), tt.wantID)
+		assert.True(t, strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
 	}
 
 }

@@ -37,6 +37,10 @@ type registerUserResponse struct {
 	Err error `json:"error,omitempty"`
 }
 
+type createPostResponse struct {
+	ID PostID `json:"id"`
+}
+
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 	u := req.Username
 	e := req.Email
