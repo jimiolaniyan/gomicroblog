@@ -101,16 +101,18 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 	if !IsValidID(string(id)) {
 		return "", ErrInvalidID
 	}
-	_, err := svc.users.FindByID(id)
+	user, err := svc.users.FindByID(id)
 	if err != nil {
 		return "", err
 	}
 
-	post, err := NewPost(id, body)
+	author := Author{UserID: id, Username: user.username}
+	post, err := NewPost(author, body)
 	if err != nil {
 		return "", err
 	}
 
+	// TODO refactor this to return next id
 	post.ID = PostID(xid.New().String())
 	if err = svc.posts.Store(post); err != nil {
 		return "", errors.New("error saving post")

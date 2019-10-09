@@ -18,17 +18,22 @@ type PostRepository interface {
 
 type PostID string
 
+type Author struct {
+	UserID   ID
+	Username string
+}
+
 type post struct {
 	ID        PostID
-	UserID    ID
+	Author    Author
 	body      string
 	timestamp time.Time
 }
 
-func NewPost(userID ID, body string) (*post, error) {
+func NewPost(author Author, body string) (*post, error) {
 	if body == "" {
 		return nil, ErrEmptyBody
 	}
 
-	return &post{UserID: userID, body: body, timestamp: time.Now()}, nil
+	return &post{Author: author, body: body, timestamp: time.Now()}, nil
 }

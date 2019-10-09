@@ -79,7 +79,7 @@ func TestPostCreation(t *testing.T) {
 				var p *post
 
 				for _, post := range posts {
-					if post.UserID == userID {
+					if post.Author.UserID == userID {
 						p = post
 					}
 				}

@@ -57,7 +57,7 @@ func (repo *postRepository) FindByID(id PostID) (*post, error) {
 func (repo *postRepository) FindByUserID(id ID) ([]*post, error) {
 	var posts []*post
 	for _, p := range repo.posts {
-		if p.UserID == id {
+		if p.Author.UserID == id {
 			posts = append(posts, p)
 		}
 	}

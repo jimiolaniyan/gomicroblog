@@ -102,12 +102,13 @@ func TestCreatePost(t *testing.T) {
 		wantValidID   bool
 		wantErr       error
 		wantTimeStamp bool
+		wantUsername  string
 	}{
-		{"", "", false, ErrInvalidID, false},
-		{"user", "", false, ErrInvalidID, false},
-		{nextID(), "post", false, ErrNotFound, false},
-		{id, "", false, ErrEmptyBody, false},
-		{id, "post", true, nil, true},
+		{"", "", false, ErrInvalidID, false, ""},
+		{"user", "", false, ErrInvalidID, false, ""},
+		{nextID(), "post", false, ErrNotFound, false, ""},
+		{id, "", false, ErrEmptyBody, false, ""},
+		{id, "post", true, nil, true, "user"},
 	}
 	for _, tt := range tests {
 		ts := time.Now()
@@ -119,7 +120,8 @@ func TestCreatePost(t *testing.T) {
 			post, err := svc.(*service).posts.FindByID(id)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.body, post.body)
-			assert.Equal(t, tt.userID, post.UserID)
+			assert.Equal(t, tt.userID, post.Author.UserID)
+			assert.Equal(t, tt.wantUsername, post.Author.Username)
 			assert.Equal(t, tt.wantTimeStamp, post.timestamp.After(ts))
 		}
 	}
