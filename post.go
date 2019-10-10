@@ -13,7 +13,7 @@ var (
 type PostRepository interface {
 	FindByID(id PostID) (*post, error)
 	Store(post *post) error
-	FindByName(username string) ([]*post, error)
+	FindPostsByName(username string) ([]*post, error)
 }
 
 type PostID string
@@ -30,6 +30,7 @@ type post struct {
 	timestamp time.Time
 }
 
+// TODO check that author id and name are properly set
 func NewPost(author Author, body string) (*post, error) {
 	if body == "" {
 		return nil, ErrEmptyBody

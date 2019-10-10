@@ -54,7 +54,7 @@ func (repo *postRepository) FindByID(id PostID) (*post, error) {
 	return nil, ErrPostNotFound
 }
 
-func (repo *postRepository) FindByName(username string) ([]*post, error) {
+func (repo *postRepository) FindPostsByName(username string) ([]*post, error) {
 	var posts []*post
 	for _, p := range repo.posts {
 		if p.Author.Username == username {

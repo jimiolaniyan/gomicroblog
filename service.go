@@ -126,7 +126,7 @@ func (svc *service) GetUserPosts(username string) ([]*post, error) {
 		return []*post{}, ErrInvalidUsername
 	}
 
-	return svc.posts.FindByName(username)
+	return svc.posts.FindPostsByName(username)
 }
 
 func NewService(users Repository, posts PostRepository) Service {
