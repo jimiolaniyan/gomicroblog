@@ -214,7 +214,7 @@ func TestCreatePostHandler(t *testing.T) {
 		{`{"body": ""}`, "", http.StatusUnauthorized, ErrInvalidID, false, ""},
 		{`{"body": ""}`, "puoiwoerigp", http.StatusUnauthorized, ErrInvalidID, false, ""},
 		{`{"body": ""}`, string(id), http.StatusUnprocessableEntity, ErrEmptyBody, false, ""},
-		{`{"body": "i love my wife :)"}`, string(id), http.StatusCreated, errors.New(""), true, "/v1/posts"},
+		{`{"body": "i love my wife :)"}`, string(id), http.StatusCreated, errors.New(""), true, "/v1/posts/"},
 	}
 
 	for _, tt := range tests {
@@ -240,4 +240,45 @@ func TestCreatePostHandler(t *testing.T) {
 		assert.True(t, strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
 	}
 
+}
+
+func TestRequireAuth(t *testing.T) {
+	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"
+	validToken, _ := getJWTToken("randomid")
+
+	tests := []struct {
+		authHeader string
+		wantCode   int
+		wantID     string
+	}{
+		{authHeader: "", wantCode: http.StatusUnauthorized},
+		{authHeader: "k", wantCode: http.StatusUnauthorized},
+		{authHeader: "Random random", wantCode: http.StatusUnauthorized},
+		{authHeader: "Bearer ", wantCode: http.StatusUnauthorized},
+		{authHeader: "Bearer random.random.random", wantCode: http.StatusUnauthorized},
+		{authHeader: "Bearer " + invalidToken, wantCode: http.StatusUnauthorized},
+		{authHeader: "Bearer " + validToken, wantCode: http.StatusOK, wantID: "randomid"},
+	}
+
+	for _, tt := range tests {
+		var id string
+		f := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			id = r.Context().Value(idKey).(string)
+			return
+		})
+
+		h := RequireAuth(f)
+		r, _ := http.NewRequest(http.MethodPost, "/v1/posts", nil)
+		r.Header.Set("Authorization", tt.authHeader)
+
+		w := httptest.NewRecorder()
+		mux := http.NewServeMux()
+		mux.Handle("/v1/posts", h)
+
+		mux.ServeHTTP(w, r)
+
+		assert.IsType(t, new(http.Handler), &h)
+		assert.Equal(t, tt.wantID, id)
+		assert.Equal(t, tt.wantCode, w.Code)
+	}
 }

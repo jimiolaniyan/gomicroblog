@@ -1,7 +1,9 @@
 package gomicroblog
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"io"
@@ -81,6 +83,38 @@ func CreatePostHandler(svc Service) http.Handler {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	})
+}
+
+func RequireAuth(f http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenStr := getTokenFromRequest(r)
+
+		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, errors.New("error verifying signing method")
+			}
+			return []byte("e624d92e3fa438b6a8fac4f698e977cd"), nil
+		})
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		claims := token.Claims.(jwt.MapClaims)
+		ctx := context.WithValue(r.Context(), idKey, claims["sub"])
+
+		f.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func getTokenFromRequest(r *http.Request) string {
+	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || strings.ToUpper(parts[0]) != "BEARER" {
+		return ""
+	}
+	return parts[1]
 }
 
 func getJWTToken(id string) (string, error) {
