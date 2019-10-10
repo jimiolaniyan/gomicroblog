@@ -209,12 +209,14 @@ func TestCreatePostHandler(t *testing.T) {
 		wantErr      error
 		wantID       bool
 		wantLocation string
+		wantCtx      bool
 	}{
-		{`invalid request`, "", http.StatusBadRequest, errors.New(""), false, ""},
-		{`{"body": ""}`, "", http.StatusUnauthorized, ErrInvalidID, false, ""},
-		{`{"body": ""}`, "puoiwoerigp", http.StatusUnauthorized, ErrInvalidID, false, ""},
-		{`{"body": ""}`, string(id), http.StatusUnprocessableEntity, ErrEmptyBody, false, ""},
-		{`{"body": "i love my wife :)"}`, string(id), http.StatusCreated, errors.New(""), true, "/v1/posts/"},
+		{`invalid request`, "", http.StatusBadRequest, errors.New(""), false, "", true},
+		{`{}`, "", http.StatusInternalServerError, ErrEmptyContext, false, "", false},
+		{`{"body": ""}`, "", http.StatusUnauthorized, ErrInvalidID, false, "", true},
+		{`{"body": ""}`, "puoiwoerigp", http.StatusUnauthorized, ErrInvalidID, false, "", true},
+		{`{"body": ""}`, string(id), http.StatusUnprocessableEntity, ErrEmptyBody, false, "", true},
+		{`{"body": "i love my wife :)"}`, string(id), http.StatusCreated, errors.New(""), true, "/v1/posts/", true},
 	}
 
 	for _, tt := range tests {
@@ -224,8 +226,12 @@ func TestCreatePostHandler(t *testing.T) {
 		mux := http.NewServeMux()
 		mux.Handle("/v1/posts", CreatePostHandler(svc))
 
-		ctx := context.WithValue(r.Context(), idKey, tt.userID)
-		mux.ServeHTTP(w, r.WithContext(ctx))
+		if tt.wantCtx {
+			ctx := context.WithValue(r.Context(), idKey, tt.userID)
+			r = r.WithContext(ctx)
+		}
+
+		mux.ServeHTTP(w, r)
 
 		var res struct {
 			ID  PostID `json:"id,omitempty"`

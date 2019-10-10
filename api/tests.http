@@ -17,3 +17,13 @@ Content-Type: application/json
   "password": "password"
 }
 ###
+
+POST http://localhost:8090/v1/posts
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoIiwic3ViIjoiYm1mcHA3cG9qcmljNGs4cHBnczAifQ.6f3R25_4L_YwNUw2NOduEaT2FlOjPf5z0YLqqNqTs7M
+Content-Type: application/json
+
+{
+  "body": "a post body"
+}
+
+###

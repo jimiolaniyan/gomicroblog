@@ -58,6 +58,8 @@ func LoginHandler(svc Service) http.Handler {
 	})
 }
 
+var ErrEmptyContext = errors.New("could not get user id from context")
+
 func CreatePostHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		request, err := decodeCreatePostRequest(r.Body)
@@ -66,8 +68,12 @@ func CreatePostHandler(svc Service) http.Handler {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		// TODO add test for 500 when there is no key in context
-		userID := r.Context().Value(idKey).(string)
+
+		userID, ok := r.Context().Value(idKey).(string)
+		if !ok {
+			encodeError(ErrEmptyContext, w)
+			return
+		}
 		req := request.(createPostRequest)
 		postId, err := svc.CreatePost(ID(userID), req.Body)
 
