@@ -5,6 +5,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
+	"time"
 )
 
 type ServiceTestSuite struct {
@@ -66,7 +67,7 @@ func TestService_RegisterNewUser(t *testing.T) {
 }
 
 func TestValidateUser(t *testing.T) {
-	svc := service{NewUserRepository()}
+	svc := service{users: NewUserRepository()}
 	_, err := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
 	assert.Nil(t, err)
 
@@ -90,7 +91,60 @@ func TestValidateUser(t *testing.T) {
 		assert.Equal(t, tt.wantErr, err)
 		assert.Equal(t, tt.wantValidID, IsValidID(string(userID)))
 	}
+}
 
+func TestCreatePost(t *testing.T) {
+	svc := NewService(NewUserRepository(), NewPostRepository())
+	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "e@mail.com"})
+	tests := []struct {
+		userID        ID
+		body          string
+		wantValidID   bool
+		wantErr       error
+		wantTimeStamp bool
+		wantUsername  string
+	}{
+		{"", "", false, ErrInvalidID, false, ""},
+		{"user", "", false, ErrInvalidID, false, ""},
+		{nextID(), "post", false, ErrNotFound, false, ""},
+		{id, "", false, ErrEmptyBody, false, ""},
+		{id, "post", true, nil, true, "user"},
+	}
+	for _, tt := range tests {
+		ts := time.Now()
+		id, err := svc.CreatePost(tt.userID, tt.body)
+		assert.Equal(t, tt.wantValidID, IsValidID(string(id)))
+		assert.Equal(t, tt.wantErr, err)
+
+		if tt.wantValidID {
+			post, err := svc.(*service).posts.FindByID(id)
+			assert.Nil(t, err)
+			assert.Equal(t, tt.body, post.body)
+			assert.Equal(t, tt.userID, post.Author.UserID)
+			assert.Equal(t, tt.wantUsername, post.Author.Username)
+			assert.Equal(t, tt.wantTimeStamp, post.timestamp.After(ts))
+		}
+	}
+}
+
+func TestGetUserPosts(t *testing.T) {
+	svc := NewService(NewUserRepository(), NewPostRepository())
+	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "e@mail.com"})
+	_, _ = svc.CreatePost(id, "body")
+	tests := []struct {
+		username     string
+		wantErr      error
+		wantPostsLen int
+	}{
+		{"", ErrInvalidUsername, 0},
+		{"user", nil, 1},
+	}
+
+	for _, tt := range tests {
+		posts, err := svc.GetUserPosts(tt.username)
+		assert.Equal(t, tt.wantErr, err)
+		assert.Equal(t, tt.wantPostsLen, len(posts))
+	}
 }
 
 func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() {
@@ -104,10 +158,13 @@ func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() 
 
 func (suite *ServiceTestSuite) TestNewService() {
 	users := NewUserRepository()
-	svc := NewService(users)
+	posts := NewPostRepository()
+	svc := NewService(users, posts)
+
 	s := svc.(*service)
 
 	assert.Equal(suite.T(), users, s.users)
+	assert.Equal(suite.T(), posts, s.posts)
 }
 
 func TestServiceSuite(t *testing.T) {

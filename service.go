@@ -1,16 +1,21 @@
 package gomicroblog
 
 import (
+	"errors"
 	"fmt"
+	"github.com/rs/xid"
 )
 
 type Service interface {
 	RegisterNewUser(req registerUserRequest) (ID, error)
 	ValidateUser(req validateUserRequest) (ID, error)
+	CreatePost(id ID, body string) (PostID, error)
+	GetUserPosts(username string) ([]*post, error)
 }
 
 type service struct {
 	users Repository
+	posts PostRepository
 }
 
 type registerUserRequest struct {
@@ -23,9 +28,17 @@ type validateUserRequest struct {
 	Username, Password string
 }
 
+type createPostRequest struct {
+	Body string
+}
+
 type registerUserResponse struct {
 	ID  ID    `json:"id,omitempty"`
 	Err error `json:"error,omitempty"`
+}
+
+type createPostResponse struct {
+	ID PostID `json:"id"`
 }
 
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
@@ -84,6 +97,38 @@ func verifyNotInUse(svc *service, username string, email string) (*user, error) 
 	return nil, nil
 }
 
-func NewService(repo Repository) Service {
-	return &service{users: repo}
+func (svc *service) CreatePost(id ID, body string) (PostID, error) {
+	if !IsValidID(string(id)) {
+		return "", ErrInvalidID
+	}
+	user, err := svc.users.FindByID(id)
+	if err != nil {
+		return "", err
+	}
+
+	author := Author{UserID: id, Username: user.username}
+	post, err := NewPost(author, body)
+	if err != nil {
+		return "", err
+	}
+
+	// TODO refactor this to return next id
+	post.ID = PostID(xid.New().String())
+	if err = svc.posts.Store(post); err != nil {
+		return "", errors.New("error saving post")
+	}
+
+	return post.ID, nil
+}
+
+func (svc *service) GetUserPosts(username string) ([]*post, error) {
+	if username == "" {
+		return []*post{}, ErrInvalidUsername
+	}
+
+	return svc.posts.FindPostsByName(username)
+}
+
+func NewService(users Repository, posts PostRepository) Service {
+	return &service{users: users, posts: posts}
 }

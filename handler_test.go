@@ -1,6 +1,7 @@
 package gomicroblog
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,7 @@ import (
 func TestDecodeRequest(t *testing.T) {
 	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
 	loginReq := `{"username": "jimi", "password": "password1"}`
+	createPostReq := `{"body": "a simple post"}`
 	tests := []struct {
 		r       string
 		decoder func(closer io.ReadCloser) (interface{}, error)
@@ -25,6 +27,7 @@ func TestDecodeRequest(t *testing.T) {
 	}{
 		{registerReq, decodeRegisterUserRequest, nil, registerUserRequest{"jimi", "password1", "test@tester.test"}},
 		{loginReq, decodeValidateUserRequest, nil, validateUserRequest{"jimi", "password1"}},
+		{createPostReq, decodeCreatePostRequest, nil, createPostRequest{"a simple post"}},
 	}
 
 	for _, tt := range tests {
@@ -153,7 +156,7 @@ func TestHandlerResponses(t *testing.T) {
 }
 
 func TestLoginHandler(t *testing.T) {
-	svc := NewService(NewUserRepository())
+	svc := NewService(NewUserRepository(), nil)
 	userID, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
 
 	tests := []struct {
@@ -193,5 +196,95 @@ func TestLoginHandler(t *testing.T) {
 				assert.Equal(t, tt.wantClaims, string(claim))
 			}
 		})
+	}
+}
+
+func TestCreatePostHandler(t *testing.T) {
+	svc := NewService(NewUserRepository(), NewPostRepository())
+	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
+
+	tests := []struct {
+		req, userID  string
+		wantCode     int
+		wantErr      error
+		wantID       bool
+		wantLocation string
+		wantCtx      bool
+	}{
+		{`invalid request`, "", http.StatusBadRequest, errors.New(""), false, "", true},
+		{`{}`, "", http.StatusInternalServerError, ErrEmptyContext, false, "", false},
+		{`{"body": ""}`, "", http.StatusUnauthorized, ErrInvalidID, false, "", true},
+		{`{"body": ""}`, "puoiwoerigp", http.StatusUnauthorized, ErrInvalidID, false, "", true},
+		{`{"body": ""}`, string(id), http.StatusUnprocessableEntity, ErrEmptyBody, false, "", true},
+		{`{"body": "i love my wife :)"}`, string(id), http.StatusCreated, errors.New(""), true, "/v1/posts/", true},
+	}
+
+	for _, tt := range tests {
+		r, _ := http.NewRequest(http.MethodPost, "/v1/posts", strings.NewReader(tt.req))
+
+		w := httptest.NewRecorder()
+		mux := http.NewServeMux()
+		mux.Handle("/v1/posts", CreatePostHandler(svc))
+
+		if tt.wantCtx {
+			ctx := context.WithValue(r.Context(), idKey, tt.userID)
+			r = r.WithContext(ctx)
+		}
+
+		mux.ServeHTTP(w, r)
+
+		var res struct {
+			ID  PostID `json:"id,omitempty"`
+			Err string `json:"error,omitempty"`
+		}
+
+		_ = json.NewDecoder(w.Body).Decode(&res)
+
+		assert.Equal(t, tt.wantCode, w.Code)
+		assert.Equal(t, tt.wantErr.Error(), res.Err)
+		assert.Equal(t, IsValidID(string(res.ID)), tt.wantID)
+		assert.True(t, strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
+	}
+
+}
+
+func TestRequireAuth(t *testing.T) {
+	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"
+	validToken, _ := getJWTToken("randomid")
+
+	tests := []struct {
+		authHeader string
+		wantCode   int
+		wantID     string
+	}{
+		{authHeader: "", wantCode: http.StatusUnauthorized},
+		{authHeader: "k", wantCode: http.StatusUnauthorized},
+		{authHeader: "Random random", wantCode: http.StatusUnauthorized},
+		{authHeader: "Bearer ", wantCode: http.StatusUnauthorized},
+		{authHeader: "Bearer random.random.random", wantCode: http.StatusUnauthorized},
+		{authHeader: "Bearer " + invalidToken, wantCode: http.StatusUnauthorized},
+		{authHeader: "Bearer " + validToken, wantCode: http.StatusOK, wantID: "randomid"},
+	}
+
+	for _, tt := range tests {
+		var id string
+		f := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			id = r.Context().Value(idKey).(string)
+			return
+		})
+
+		h := RequireAuth(f)
+		r, _ := http.NewRequest(http.MethodPost, "/v1/posts", nil)
+		r.Header.Set("Authorization", tt.authHeader)
+
+		w := httptest.NewRecorder()
+		mux := http.NewServeMux()
+		mux.Handle("/v1/posts", h)
+
+		mux.ServeHTTP(w, r)
+
+		assert.IsType(t, new(http.Handler), &h)
+		assert.Equal(t, tt.wantID, id)
+		assert.Equal(t, tt.wantCode, w.Code)
 	}
 }

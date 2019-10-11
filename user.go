@@ -18,6 +18,7 @@ type ID string
 
 // TODO: consider moving username, password
 //  and email to a credentials value object
+//  as part of an auth service
 type user struct {
 	ID       ID
 	username string
@@ -26,10 +27,11 @@ type user struct {
 }
 
 var (
-	ErrNotFound           = errors.New("user not found")
+	ErrInvalidID          = errors.New("invalid user id")
 	ErrInvalidUsername    = errors.New("invalid username")
 	ErrInvalidPassword    = errors.New("invalid password")
 	ErrInvalidEmail       = errors.New("invalid email address")
+	ErrNotFound           = errors.New("user not found")
 	ErrExistingUsername   = errors.New("username in use")
 	ErrExistingEmail      = errors.New("email in use")
 	ErrInvalidCredentials = errors.New("invalid username or password")
