@@ -16,7 +16,7 @@ application in Golang using TDD, BDD and Robert C. Martin's Clean Architecture.
 `./blog`
 
 ## API Requests 
-See `api/tests.http` for full examples.
+See `api/requests.http` for full examples.
 ### Register new user
 ```
 curl -X POST \

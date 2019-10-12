@@ -1,9 +1,10 @@
 package main
 
 import (
-	blog "github.com/jimiolaniyan/gomicroblog"
 	"log"
 	"net/http"
+
+	blog "github.com/jimiolaniyan/gomicroblog"
 )
 
 func main() {

@@ -2,9 +2,10 @@ package gomicroblog
 
 import (
 	"errors"
+	"strings"
+
 	"github.com/rs/xid"
 	"golang.org/x/crypto/bcrypt"
-	"strings"
 )
 
 type Repository interface {

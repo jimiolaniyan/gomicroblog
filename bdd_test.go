@@ -1,8 +1,9 @@
 package gomicroblog
 
 import (
-	. "github.com/smartystreets/goconvey/convey"
 	"testing"
+
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestRegisterNewUser(t *testing.T) {
@@ -76,7 +77,7 @@ func TestPostCreation(t *testing.T) {
 
 			Convey("Then the user's posts will contain P", func() {
 				posts, _ := svc.GetUserPosts("U")
-				var p *post
+				p := &post{}
 
 				for _, post := range posts {
 					if post.Author.Username == "U" {

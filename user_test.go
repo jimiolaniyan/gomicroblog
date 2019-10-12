@@ -1,9 +1,10 @@
 package gomicroblog
 
 import (
+	"testing"
+
 	"github.com/rs/xid"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestHashPassword_ReturnsCorrectHash(t *testing.T) {

@@ -3,6 +3,7 @@ package gomicroblog
 import (
 	"errors"
 	"fmt"
+
 	"github.com/rs/xid"
 )
 
