@@ -2,6 +2,7 @@ package gomicroblog
 
 import (
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -90,5 +91,38 @@ func TestPostCreation(t *testing.T) {
 				So(body, ShouldEqual, p.body)
 			})
 		})
+	})
+}
+
+func TestProfileWithNoPosts(t *testing.T) {
+	Convey("Given a newly registered user U with no posts", t, func() {
+		now := time.Now().UTC()
+		svc := NewService(NewUserRepository(), NewPostRepository())
+		email := "user@app.com"
+		userID, err := svc.RegisterNewUser(registerUserRequest{"U", "password", email})
+		So(err, ShouldBeNil)
+		So(IsValidID(string(userID)), ShouldBeTrue)
+
+		Convey("When his profile is requested", func() {
+			profile, err := svc.GetProfile("U")
+			So(err, ShouldBeNil)
+			So(profile, ShouldNotBeNil)
+
+			Convey("Then his profile is as follows", func() {
+				expectedProfile := profileResponse{
+					Username: "U",
+					Avatar:   avatar(email),
+					Bio:      "",
+					Joined:   profile.Joined,
+					LastSeen: profile.LastSeen,
+				}
+
+				So(profile, ShouldResemble, expectedProfile)
+				So(profile.Joined.After(now), ShouldBeTrue)
+				So(profile.LastSeen.After(now), ShouldBeTrue)
+			})
+
+		})
+
 	})
 }

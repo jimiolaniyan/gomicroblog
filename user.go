@@ -3,6 +3,7 @@ package gomicroblog
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/rs/xid"
 	"golang.org/x/crypto/bcrypt"
@@ -21,10 +22,12 @@ type ID string
 //  and email to a credentials value object
 //  as part of an auth service
 type user struct {
-	ID       ID
-	username string
-	password string
-	email    string
+	ID        ID
+	username  string
+	password  string
+	email     string
+	createdAt time.Time
+	lastSeen  time.Time
 }
 
 var (

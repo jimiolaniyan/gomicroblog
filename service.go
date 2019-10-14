@@ -1,8 +1,10 @@
 package gomicroblog
 
 import (
+	"crypto/md5"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/rs/xid"
 )
@@ -12,6 +14,7 @@ type Service interface {
 	ValidateUser(req validateUserRequest) (ID, error)
 	CreatePost(id ID, body string) (PostID, error)
 	GetUserPosts(username string) ([]*post, error)
+	GetProfile(username string) (profileResponse, error)
 }
 
 type service struct {
@@ -42,6 +45,21 @@ type createPostResponse struct {
 	ID PostID `json:"id"`
 }
 
+type Relationships struct {
+	Followers []user `json:"followers"`
+	Following []user `json:"following"`
+}
+
+type profileResponse struct {
+	Username      string        `json:"username"`
+	Avatar        string        `json:"avatar_url,omitempty"`
+	Bio           string        `json:"bio,omitempty"`
+	Joined        time.Time     `json:"joined"`
+	LastSeen      time.Time     `json:"last_seen"`
+	Relationships Relationships `json:"relationships"`
+	Posts         []post        `json:"posts"`
+}
+
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 	u := req.Username
 	e := req.Email
@@ -64,6 +82,9 @@ func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 		user.password = hash
 	}
 
+	now := time.Now().UTC()
+	user.createdAt = now
+	user.lastSeen = now
 	if err = svc.users.Store(user); err != nil {
 		return "", fmt.Errorf("error saving user: %s ", err)
 	}
@@ -128,6 +149,29 @@ func (svc *service) GetUserPosts(username string) ([]*post, error) {
 	}
 
 	return svc.posts.FindPostsByName(username)
+}
+
+func (svc *service) GetProfile(username string) (profileResponse, error) {
+	if username == "" {
+		return profileResponse{}, ErrInvalidUsername
+	}
+
+	user, err := svc.users.FindByName(username)
+	if err != nil {
+		return profileResponse{}, ErrNotFound
+	}
+
+	return profileResponse{
+		Username: username,
+		Avatar:   avatar(user.email),
+		Joined:   user.createdAt,
+		LastSeen: user.lastSeen,
+	}, nil
+}
+
+func avatar(email string) string {
+	digest := fmt.Sprintf("%x", md5.Sum([]byte(email)))
+	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?d=identicon", digest)
 }
 
 func NewService(users Repository, posts PostRepository) Service {

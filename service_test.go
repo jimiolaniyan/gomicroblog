@@ -21,38 +21,39 @@ func (suite *ServiceTestSuite) SetupTest() {
 }
 
 func TestService_RegisterNewUser(t *testing.T) {
+	now := time.Now().UTC()
 	svc := service{users: NewUserRepository()}
 	req := registerUserRequest{"username", "password", "a@b"}
 
 	tests := []struct {
-		description string
-		req         *registerUserRequest
-		wantValidID bool
-		wantErr     error
+		description                string
+		req                        *registerUserRequest
+		wantValidID, wantCreatedAt bool
+		wantLastSeen               bool
+		wantErr                    error
 	}{
 		{
-			"ExistingUsername",
-			&registerUserRequest{"username", "password1", "b@c"},
-			false,
-			ErrExistingUsername,
+			description: "ExistingUsername",
+			req:         &registerUserRequest{"username", "password1", "b@c"},
+			wantErr:     ErrExistingUsername,
 		},
 		{
-			"ExistingEmail",
-			&registerUserRequest{"username2", "password1", "a@b"},
-			false,
-			ErrExistingEmail,
+			description: "ExistingEmail",
+			req:         &registerUserRequest{"username2", "password1", "a@b"},
+			wantErr:     ErrExistingEmail,
 		},
 		{
-			"InvalidPassword",
-			&registerUserRequest{"username2", "passwod", "b@c"},
-			false,
-			ErrInvalidPassword,
+			description: "InvalidPassword",
+			req:         &registerUserRequest{"username2", "passwod", "b@c"},
+			wantErr:     ErrInvalidPassword,
 		},
 		{
-			"ValidCredentials",
-			&registerUserRequest{"username2", "password", "b@c.com"},
-			true,
-			nil,
+			description:   "ValidCredentials",
+			req:           &registerUserRequest{"username2", "password", "b@c.com"},
+			wantValidID:   true,
+			wantCreatedAt: true,
+			wantLastSeen:  true,
+			wantErr:       nil,
 		},
 	}
 
@@ -61,8 +62,14 @@ func TestService_RegisterNewUser(t *testing.T) {
 			_, err := svc.RegisterNewUser(req)
 			userID, err := svc.RegisterNewUser(*tt.req)
 
-			assert.Equal(t, IsValidID(string(userID)), tt.wantValidID)
 			assert.Equal(t, tt.wantErr, err)
+			assert.Equal(t, IsValidID(string(userID)), tt.wantValidID)
+
+			user, _ := svc.users.FindByID(userID)
+			if user != nil {
+				assert.Equal(t, tt.wantCreatedAt, user.createdAt.After(now))
+				assert.Equal(t, tt.wantLastSeen, user.lastSeen.After(now))
+			}
 		})
 	}
 }
@@ -145,6 +152,37 @@ func TestGetUserPosts(t *testing.T) {
 		posts, err := svc.GetUserPosts(tt.username)
 		assert.Equal(t, tt.wantErr, err)
 		assert.Equal(t, tt.wantPostsLen, len(posts))
+	}
+}
+
+func TestService_GetProfile(t *testing.T) {
+	svc := NewService(NewUserRepository(), NewPostRepository())
+	email := "e@mail.com"
+	userID, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", email})
+	user, _ := svc.(*service).users.FindByID(userID)
+
+	tests := []struct {
+		username                 string
+		wantErr                  error
+		wantUsername, wantAvatar string
+		wantJoined, wantLastSeen bool
+	}{
+		{username: "", wantErr: ErrInvalidUsername, wantUsername: ""},
+		{username: "void", wantErr: ErrNotFound, wantUsername: ""},
+		{username: "user", wantErr: nil, wantUsername: "user", wantAvatar: avatar(email), wantJoined: true, wantLastSeen: true},
+	}
+
+	for _, tt := range tests {
+		p, err := svc.GetProfile(tt.username)
+
+		assert.Equal(t, tt.wantErr, err)
+		assert.Equal(t, tt.wantUsername, p.Username)
+		assert.Equal(t, tt.wantAvatar, p.Avatar)
+
+		if tt.wantJoined || tt.wantLastSeen {
+			assert.Equal(t, user.createdAt, p.Joined)
+			assert.Equal(t, user.lastSeen, p.LastSeen)
+		}
 	}
 }
 
