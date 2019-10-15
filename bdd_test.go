@@ -126,3 +126,53 @@ func TestProfileWithNoPosts(t *testing.T) {
 
 	})
 }
+
+func TestProfileWithPosts(t *testing.T) {
+	Convey("Given a returning user U with posts", t, func() {
+		svc := NewService(NewUserRepository(), NewPostRepository())
+		userID, err := svc.RegisterNewUser(registerUserRequest{"U", "password", "user@app.com"})
+		postIDs, ok := createPosts(userID, svc)
+
+		So(err, ShouldBeNil)
+		So(ok, ShouldBeTrue)
+
+		Convey("When his profile is requested", func() {
+			profile, err := svc.GetProfile("U")
+
+			So(err, ShouldBeNil)
+			So(profile, ShouldNotBeNil)
+
+			Convey("Then his profile contains his posts is reverse chronological order", func() {
+				err := svc.UpdateLastSeen(userID)
+
+				av := avatar("user@app.com")
+				expected := profileResponse{
+					Posts: []post{
+						{ID: postIDs[2], Author: Author{Username: "U", UserID: userID, Avatar: av}, body: "C", timestamp: profile.Posts[0].timestamp},
+						{ID: postIDs[1], Author: Author{Username: "U", UserID: userID, Avatar: av}, body: "B", timestamp: profile.Posts[1].timestamp},
+						{ID: postIDs[0], Author: Author{Username: "U", UserID: userID, Avatar: av}, body: "A", timestamp: profile.Posts[2].timestamp},
+					},
+				}
+
+				So(err, ShouldBeNil)
+				So(expected.Posts, ShouldResemble, profile.Posts)
+			})
+
+			Convey("Add his last seen is updated.", func() {
+				user, _ := svc.(*service).users.FindByID(userID)
+				So(profile.LastSeen, ShouldEqual, user.lastSeen)
+				So(profile.LastSeen.After(profile.Joined), ShouldBeTrue)
+			})
+		})
+	})
+}
+
+func createPosts(id ID, svc Service) (ids []PostID, ok bool) {
+	id1, _ := svc.CreatePost(id, "A")
+	id2, _ := svc.CreatePost(id, "B")
+	id3, _ := svc.CreatePost(id, "C")
+
+	ids = append(ids, id1, id2, id3)
+	ok = true
+	return
+}

@@ -21,6 +21,7 @@ type PostID string
 type Author struct {
 	UserID   ID
 	Username string
+	Avatar   string
 }
 
 type post struct {

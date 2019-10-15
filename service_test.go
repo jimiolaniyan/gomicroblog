@@ -11,13 +11,16 @@ import (
 
 type ServiceTestSuite struct {
 	suite.Suite
-	svc service
-	req registerUserRequest
+	svc    service
+	req    registerUserRequest
+	userID ID
 }
 
 func (suite *ServiceTestSuite) SetupTest() {
 	suite.svc = service{users: NewUserRepository()}
 	suite.req = registerUserRequest{"username", "password", "a@b"}
+	id, _ := suite.svc.RegisterNewUser(suite.req)
+	suite.userID = id
 }
 
 func TestService_RegisterNewUser(t *testing.T) {
@@ -74,7 +77,7 @@ func TestService_RegisterNewUser(t *testing.T) {
 	}
 }
 
-func TestValidateUser(t *testing.T) {
+func TestService_ValidateUser(t *testing.T) {
 	svc := service{users: NewUserRepository()}
 	_, err := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
 	assert.Nil(t, err)
@@ -101,22 +104,22 @@ func TestValidateUser(t *testing.T) {
 	}
 }
 
-func TestCreatePost(t *testing.T) {
+func TestService_CreatePost(t *testing.T) {
 	svc := NewService(NewUserRepository(), NewPostRepository())
 	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "e@mail.com"})
+	av := avatar("e@mail.com")
 	tests := []struct {
-		userID        ID
-		body          string
-		wantValidID   bool
-		wantErr       error
-		wantTimeStamp bool
-		wantUsername  string
+		userID               ID
+		body                 string
+		wantErr              error
+		wantValidID, wantTS  bool
+		wantUsername, wantAv string
 	}{
-		{"", "", false, ErrInvalidID, false, ""},
-		{"user", "", false, ErrInvalidID, false, ""},
-		{nextID(), "post", false, ErrNotFound, false, ""},
-		{id, "", false, ErrEmptyBody, false, ""},
-		{id, "post", true, nil, true, "user"},
+		{wantErr: ErrInvalidID},
+		{userID: "user", wantErr: ErrInvalidID},
+		{userID: nextID(), body: "post", wantErr: ErrNotFound},
+		{userID: id, wantErr: ErrEmptyBody},
+		{userID: id, body: "post", wantValidID: true, wantErr: nil, wantTS: true, wantUsername: "user", wantAv: av},
 	}
 	for _, tt := range tests {
 		ts := time.Now()
@@ -130,15 +133,17 @@ func TestCreatePost(t *testing.T) {
 			assert.Equal(t, tt.body, post.body)
 			assert.Equal(t, tt.userID, post.Author.UserID)
 			assert.Equal(t, tt.wantUsername, post.Author.Username)
-			assert.Equal(t, tt.wantTimeStamp, post.timestamp.After(ts))
+			assert.Equal(t, tt.wantTS, post.timestamp.After(ts))
+			assert.Equal(t, tt.wantAv, post.Author.Avatar)
 		}
 	}
 }
 
-func TestGetUserPosts(t *testing.T) {
+func TestService_GetUserPosts(t *testing.T) {
 	svc := NewService(NewUserRepository(), NewPostRepository())
 	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "e@mail.com"})
 	_, _ = svc.CreatePost(id, "body")
+
 	tests := []struct {
 		username     string
 		wantErr      error
@@ -182,6 +187,28 @@ func TestService_GetProfile(t *testing.T) {
 		if tt.wantJoined || tt.wantLastSeen {
 			assert.Equal(t, user.createdAt, p.Joined)
 			assert.Equal(t, user.lastSeen, p.LastSeen)
+		}
+	}
+}
+
+func (suite *ServiceTestSuite) TestService_UpdateLastSeen() {
+	tests := []struct {
+		userID  ID
+		wantErr error
+		wantLS  bool
+	}{
+		{wantErr: ErrInvalidID},
+		{userID: nextID(), wantErr: ErrNotFound},
+		{userID: suite.userID, wantLS: true},
+	}
+	now := time.Now().UTC()
+	for _, tt := range tests {
+		err := suite.svc.UpdateLastSeen(tt.userID)
+		assert.Equal(suite.T(), tt.wantErr, err)
+
+		if tt.wantLS {
+			user, _ := suite.svc.users.FindByID(tt.userID)
+			assert.Equal(suite.T(), tt.wantLS, user.lastSeen.After(now))
 		}
 	}
 }

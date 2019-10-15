@@ -15,6 +15,7 @@ type Service interface {
 	CreatePost(id ID, body string) (PostID, error)
 	GetUserPosts(username string) ([]*post, error)
 	GetProfile(username string) (profileResponse, error)
+	UpdateLastSeen(id ID) error
 }
 
 type service struct {
@@ -128,7 +129,7 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 		return "", err
 	}
 
-	author := Author{UserID: id, Username: user.username}
+	author := Author{UserID: id, Username: user.username, Avatar: avatar(user.email)}
 	post, err := NewPost(author, body)
 	if err != nil {
 		return "", err
@@ -167,6 +168,24 @@ func (svc *service) GetProfile(username string) (profileResponse, error) {
 		Joined:   user.createdAt,
 		LastSeen: user.lastSeen,
 	}, nil
+}
+
+func (svc *service) UpdateLastSeen(id ID) error {
+	if !IsValidID(string(id)) {
+		return ErrInvalidID
+	}
+
+	user, err := svc.users.FindByID(id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	user.lastSeen = time.Now().UTC()
+	err = svc.users.Store(user)
+	if err != nil {
+		return fmt.Errorf("error updating last seen: %s", err.Error())
+	}
+	return nil
 }
 
 func avatar(email string) string {
