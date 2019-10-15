@@ -1,5 +1,7 @@
 package gomicroblog
 
+import "sort"
+
 type userRepository struct {
 	users map[ID]*user
 }
@@ -39,31 +41,36 @@ func NewUserRepository() Repository {
 }
 
 type postRepository struct {
-	posts map[PostID]*post
+	posts map[PostID]post
 }
 
-func (repo *postRepository) Store(post *post) error {
+func (repo *postRepository) Store(post post) error {
 	repo.posts[post.ID] = post
 	return nil
 }
 
-func (repo *postRepository) FindByID(id PostID) (*post, error) {
+func (repo *postRepository) FindByID(id PostID) (post, error) {
 	if p, ok := repo.posts[id]; ok {
 		return p, nil
 	}
-	return nil, ErrPostNotFound
+	return post{}, ErrPostNotFound
 }
 
-func (repo *postRepository) FindPostsByName(username string) ([]*post, error) {
-	var posts []*post
+func (repo *postRepository) FindLatestPostsByName(username string) ([]post, error) {
+	var posts []post
 	for _, p := range repo.posts {
 		if p.Author.Username == username {
 			posts = append(posts, p)
 		}
 	}
+
+	sort.Slice(posts, func(i, j int) bool {
+		return posts[i].timestamp.After(posts[j].timestamp)
+	})
+
 	return posts, nil
 }
 
 func NewPostRepository() PostRepository {
-	return &postRepository{posts: map[PostID]*post{}}
+	return &postRepository{posts: map[PostID]post{}}
 }

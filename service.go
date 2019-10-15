@@ -13,7 +13,7 @@ type Service interface {
 	RegisterNewUser(req registerUserRequest) (ID, error)
 	ValidateUser(req validateUserRequest) (ID, error)
 	CreatePost(id ID, body string) (PostID, error)
-	GetUserPosts(username string) ([]*post, error)
+	GetUserPosts(username string) ([]post, error)
 	GetProfile(username string) (profileResponse, error)
 	UpdateLastSeen(id ID) error
 }
@@ -137,19 +137,19 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 
 	// TODO refactor this to return next id
 	post.ID = PostID(xid.New().String())
-	if err = svc.posts.Store(post); err != nil {
+	if err = svc.posts.Store(*post); err != nil {
 		return "", errors.New("error saving post")
 	}
 
 	return post.ID, nil
 }
 
-func (svc *service) GetUserPosts(username string) ([]*post, error) {
+func (svc *service) GetUserPosts(username string) ([]post, error) {
 	if username == "" {
-		return []*post{}, ErrInvalidUsername
+		return []post{}, ErrInvalidUsername
 	}
 
-	return svc.posts.FindPostsByName(username)
+	return svc.posts.FindLatestPostsByName(username)
 }
 
 func (svc *service) GetProfile(username string) (profileResponse, error) {
@@ -162,11 +162,13 @@ func (svc *service) GetProfile(username string) (profileResponse, error) {
 		return profileResponse{}, ErrNotFound
 	}
 
+	posts, err := svc.posts.FindLatestPostsByName(username)
 	return profileResponse{
 		Username: username,
 		Avatar:   avatar(user.email),
 		Joined:   user.createdAt,
 		LastSeen: user.lastSeen,
+		Posts:    posts,
 	}, nil
 }
 

@@ -214,9 +214,7 @@ func (suite *ServiceTestSuite) TestService_UpdateLastSeen() {
 }
 
 func (suite *ServiceTestSuite) TestRegisterNewUser_AssignsUserAHashedPassword() {
-	userID, _ := suite.svc.RegisterNewUser(suite.req)
-
-	user, err := suite.svc.users.FindByID(userID)
+	user, err := suite.svc.users.FindByID(suite.userID)
 
 	assert.Nil(suite.T(), err)
 	assert.True(suite.T(), checkPasswordHash(user.password, "password"))
