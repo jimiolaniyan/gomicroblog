@@ -28,6 +28,7 @@ type user struct {
 	email     string
 	createdAt time.Time
 	lastSeen  time.Time
+	bio       string
 }
 
 var (

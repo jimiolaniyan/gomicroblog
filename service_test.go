@@ -207,7 +207,24 @@ func (ts *ServiceTestSuite) TestService_UpdateLastSeen() {
 	}
 }
 
-func (ts ServiceTestSuite) TestNewService() {
+func (ts *ServiceTestSuite) TestEditProfile() {
+	tests := []struct {
+		id      ID
+		req     editProfileRequest
+		wantErr error
+	}{
+		{wantErr: ErrInvalidID},
+		{id: nextID(), wantErr: ErrNotFound},
+	}
+
+	for _, tt := range tests {
+		err := ts.svc.EditProfile(tt.id, tt.req)
+		assert.Equal(ts.T(), tt.wantErr, err)
+	}
+
+}
+
+func (ts *ServiceTestSuite) TestNewService() {
 	users := NewUserRepository()
 	posts := NewPostRepository()
 	svc := NewService(users, posts)

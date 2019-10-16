@@ -16,6 +16,7 @@ type Service interface {
 	GetUserPosts(username string) ([]*post, error)
 	GetProfile(username string) (profileResponse, error)
 	UpdateLastSeen(id ID) error
+	EditProfile(id ID, req editProfileRequest) error
 }
 
 type service struct {
@@ -35,6 +36,11 @@ type validateUserRequest struct {
 
 type createPostRequest struct {
 	Body string
+}
+
+type editProfileRequest struct {
+	Username string
+	Bio      string
 }
 
 type registerUserResponse struct {
@@ -208,6 +214,19 @@ func addAuthorInfoToPosts(posts []*post, user *user) {
 func avatar(email string) string {
 	digest := fmt.Sprintf("%x", md5.Sum([]byte(email)))
 	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?d=identicon", digest)
+}
+
+func (svc *service) EditProfile(id ID, req editProfileRequest) error {
+	if !IsValidID(string(id)) {
+		return ErrInvalidID
+	}
+
+	_, err := svc.users.FindByID(id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	return nil
 }
 
 func NewService(users Repository, posts PostRepository) Service {

@@ -168,6 +168,26 @@ func TestProfileWithPosts(t *testing.T) {
 	})
 }
 
+func TestEditUserProfile(t *testing.T) {
+	Convey("Given a returning user U", t, func() {
+		svc := NewService(NewUserRepository(), NewPostRepository())
+		id, _ := svc.RegisterNewUser(registerUserRequest{"U", "password", "user@app.com"})
+
+		Convey("When the user edits his profile", func() {
+			bio := "My wonderful bio"
+			err := svc.EditProfile(id, editProfileRequest{Username: "U2", Bio: bio})
+
+			So(err, ShouldBeNil)
+
+			Convey("Then his profile shows the updated information", func() {
+				user, _ := svc.(*service).users.FindByID(id)
+				So(user.username, ShouldEqual, "U2")
+				So(user.bio, ShouldEqual, bio)
+			})
+		})
+	})
+}
+
 func createPosts(id ID, svc Service) (ids []PostID, ok bool) {
 	id1, _ := svc.CreatePost(id, "A")
 	id2, _ := svc.CreatePost(id, "B")
