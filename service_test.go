@@ -212,9 +212,9 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 	longBio := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut " +
 		"labore et dolore magna aliqua. Ut enim ad minim h"
 
-	snapshot := *ts.user
-	newUser := snapshot
+	newUser := *ts.user
 	newUser.ID = nextID()
+	newUser.username = "newUsername"
 
 	err := ts.svc.users.Store(&newUser)
 	assert.Nil(ts.T(), err)
