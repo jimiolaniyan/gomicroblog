@@ -13,7 +13,7 @@ type Service interface {
 	RegisterNewUser(req registerUserRequest) (ID, error)
 	ValidateUser(req validateUserRequest) (ID, error)
 	CreatePost(id ID, body string) (PostID, error)
-	GetUserPosts(username string) ([]post, error)
+	GetUserPosts(username string) ([]*post, error)
 	GetProfile(username string) (profileResponse, error)
 	UpdateLastSeen(id ID) error
 }
@@ -58,7 +58,7 @@ type profileResponse struct {
 	Joined        time.Time     `json:"joined"`
 	LastSeen      time.Time     `json:"last_seen"`
 	Relationships Relationships `json:"relationships"`
-	Posts         []post        `json:"posts"`
+	Posts         []*post       `json:"posts"`
 }
 
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
@@ -129,7 +129,7 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 		return "", err
 	}
 
-	author := Author{UserID: id, Username: user.username, Avatar: avatar(user.email)}
+	author := Author{UserID: id, Username: user.username}
 	post, err := NewPost(author, body)
 	if err != nil {
 		return "", err
@@ -144,9 +144,9 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 	return post.ID, nil
 }
 
-func (svc *service) GetUserPosts(username string) ([]post, error) {
+func (svc *service) GetUserPosts(username string) ([]*post, error) {
 	if username == "" {
-		return []post{}, ErrInvalidUsername
+		return nil, ErrInvalidUsername
 	}
 
 	return svc.posts.FindLatestPostsByName(username)
@@ -163,6 +163,11 @@ func (svc *service) GetProfile(username string) (profileResponse, error) {
 	}
 
 	posts, err := svc.posts.FindLatestPostsByName(username)
+
+	for _, p := range posts {
+		p.Author.Avatar = avatar(user.email)
+	}
+
 	return profileResponse{
 		Username: username,
 		Avatar:   avatar(user.email),

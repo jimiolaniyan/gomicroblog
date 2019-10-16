@@ -78,7 +78,7 @@ func TestPostCreation(t *testing.T) {
 
 			Convey("Then the user's posts will contain P", func() {
 				posts, _ := svc.GetUserPosts("U")
-				p := post{}
+				p := &post{}
 
 				for _, post := range posts {
 					if post.Author.Username == "U" {
@@ -149,7 +149,7 @@ func TestProfileWithPosts(t *testing.T) {
 
 				av := avatar("user@app.com")
 				expected := profileResponse{
-					Posts: []post{
+					Posts: []*post{
 						{ID: postIDs[2], Author: Author{Username: "U", UserID: userID, Avatar: av}, body: "C", timestamp: profile.Posts[0].timestamp},
 						{ID: postIDs[1], Author: Author{Username: "U", UserID: userID, Avatar: av}, body: "B", timestamp: profile.Posts[1].timestamp},
 						{ID: postIDs[0], Author: Author{Username: "U", UserID: userID, Avatar: av}, body: "A", timestamp: profile.Posts[2].timestamp},

@@ -107,19 +107,18 @@ func TestService_ValidateUser(t *testing.T) {
 func TestService_CreatePost(t *testing.T) {
 	svc := NewService(NewUserRepository(), NewPostRepository())
 	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "e@mail.com"})
-	av := avatar("e@mail.com")
 	tests := []struct {
-		userID               ID
-		body                 string
-		wantErr              error
-		wantValidID, wantTS  bool
-		wantUsername, wantAv string
+		userID              ID
+		body                string
+		wantErr             error
+		wantValidID, wantTS bool
+		wantUsername        string
 	}{
 		{wantErr: ErrInvalidID},
 		{userID: "user", wantErr: ErrInvalidID},
 		{userID: nextID(), body: "post", wantErr: ErrNotFound},
 		{userID: id, wantErr: ErrEmptyBody},
-		{userID: id, body: "post", wantValidID: true, wantErr: nil, wantTS: true, wantUsername: "user", wantAv: av},
+		{userID: id, body: "post", wantValidID: true, wantErr: nil, wantTS: true, wantUsername: "user"},
 	}
 	for _, tt := range tests {
 		ts := time.Now()
@@ -134,7 +133,6 @@ func TestService_CreatePost(t *testing.T) {
 			assert.Equal(t, tt.userID, post.Author.UserID)
 			assert.Equal(t, tt.wantUsername, post.Author.Username)
 			assert.Equal(t, tt.wantTS, post.timestamp.After(ts))
-			assert.Equal(t, tt.wantAv, post.Author.Avatar)
 		}
 	}
 }
