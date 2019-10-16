@@ -40,6 +40,7 @@ var (
 	ErrExistingUsername   = errors.New("username in use")
 	ErrExistingEmail      = errors.New("email in use")
 	ErrInvalidCredentials = errors.New("invalid username or password")
+	ErrBioTooLong         = errors.New("bio cannot be more than 140 characters")
 )
 
 func NewUser(username, email string) (*user, error) {

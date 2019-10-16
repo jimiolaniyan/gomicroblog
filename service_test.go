@@ -208,20 +208,38 @@ func (ts *ServiceTestSuite) TestService_UpdateLastSeen() {
 }
 
 func (ts *ServiceTestSuite) TestEditProfile() {
+	r := editProfileRequest{Username: "U", Bio: "My new bio"}
+	longBio := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut " +
+		"labore et dolore magna aliqua. Ut enim ad minim h"
+
+	snapshot := *ts.user
+	newUser := snapshot
+	newUser.ID = nextID()
+
+	err := ts.svc.users.Store(&newUser)
+	assert.Nil(ts.T(), err)
+
 	tests := []struct {
 		id      ID
 		req     editProfileRequest
 		wantErr error
 	}{
 		{wantErr: ErrInvalidID},
-		{id: nextID(), wantErr: ErrNotFound},
+		{id: nextID(), wantErr: ErrInvalidUsername},
+		{id: nextID(), req: r, wantErr: ErrNotFound},
+		{id: newUser.ID, req: editProfileRequest{"U", longBio}, wantErr: ErrBioTooLong},
+		{id: newUser.ID, req: r, wantErr: nil},
 	}
 
 	for _, tt := range tests {
 		err := ts.svc.EditProfile(tt.id, tt.req)
 		assert.Equal(ts.T(), tt.wantErr, err)
-	}
 
+		if tt.wantErr == nil {
+			assert.Equal(ts.T(), tt.req.Username, newUser.username)
+			assert.Equal(ts.T(), tt.req.Bio, newUser.bio)
+		}
+	}
 }
 
 func (ts *ServiceTestSuite) TestNewService() {

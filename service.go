@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rs/xid"
@@ -221,10 +222,22 @@ func (svc *service) EditProfile(id ID, req editProfileRequest) error {
 		return ErrInvalidID
 	}
 
-	_, err := svc.users.FindByID(id)
+	if req.Username == "" {
+		return ErrInvalidUsername
+	}
+
+	bio := strings.TrimSpace(req.Bio)
+	if len(bio) > 140 {
+		return ErrBioTooLong
+	}
+
+	user, err := svc.users.FindByID(id)
 	if err != nil {
 		return ErrNotFound
 	}
+
+	user.username = req.Username
+	user.bio = bio
 
 	return nil
 }
