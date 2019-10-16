@@ -124,12 +124,12 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 	if !IsValidID(string(id)) {
 		return "", ErrInvalidID
 	}
-	user, err := svc.users.FindByID(id)
+	_, err := svc.users.FindByID(id)
 	if err != nil {
 		return "", err
 	}
 
-	author := Author{UserID: id, Username: user.username}
+	author := Author{UserID: id}
 	post, err := NewPost(author, body)
 	if err != nil {
 		return "", err
@@ -149,7 +149,12 @@ func (svc *service) GetUserPosts(username string) ([]*post, error) {
 		return nil, ErrInvalidUsername
 	}
 
-	return svc.posts.FindLatestPostsByName(username)
+	user, err := svc.users.FindByName(username)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	return svc.posts.FindLatestPostsForUser(user.ID)
 }
 
 func (svc *service) GetProfile(username string) (profileResponse, error) {
@@ -162,11 +167,9 @@ func (svc *service) GetProfile(username string) (profileResponse, error) {
 		return profileResponse{}, ErrNotFound
 	}
 
-	posts, err := svc.posts.FindLatestPostsByName(username)
+	posts, err := svc.posts.FindLatestPostsForUser(user.ID)
 
-	for _, p := range posts {
-		p.Author.Avatar = avatar(user.email)
-	}
+	addAuthorInfoToPosts(posts, user)
 
 	return profileResponse{
 		Username: username,
@@ -193,6 +196,13 @@ func (svc *service) UpdateLastSeen(id ID) error {
 		return fmt.Errorf("error updating last seen: %s", err.Error())
 	}
 	return nil
+}
+
+func addAuthorInfoToPosts(posts []*post, user *user) {
+	for _, p := range posts {
+		p.Author.Avatar = avatar(user.email)
+		p.Author.Username = user.username
+	}
 }
 
 func avatar(email string) string {

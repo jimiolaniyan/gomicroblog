@@ -118,7 +118,7 @@ func TestService_CreatePost(t *testing.T) {
 		{userID: "user", wantErr: ErrInvalidID},
 		{userID: nextID(), body: "post", wantErr: ErrNotFound},
 		{userID: id, wantErr: ErrEmptyBody},
-		{userID: id, body: "post", wantValidID: true, wantErr: nil, wantTS: true, wantUsername: "user"},
+		{userID: id, body: "post", wantValidID: true, wantErr: nil, wantTS: true},
 	}
 	for _, tt := range tests {
 		ts := time.Now()
@@ -131,7 +131,6 @@ func TestService_CreatePost(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, tt.body, post.body)
 			assert.Equal(t, tt.userID, post.Author.UserID)
-			assert.Equal(t, tt.wantUsername, post.Author.Username)
 			assert.Equal(t, tt.wantTS, post.timestamp.After(ts))
 		}
 	}
@@ -147,8 +146,9 @@ func TestService_GetUserPosts(t *testing.T) {
 		wantErr      error
 		wantPostsLen int
 	}{
-		{"", ErrInvalidUsername, 0},
-		{"user", nil, 1},
+		{wantErr: ErrInvalidUsername},
+		{username: "void", wantErr: ErrNotFound},
+		{username: "user", wantErr: nil, wantPostsLen: 1},
 	}
 
 	for _, tt := range tests {

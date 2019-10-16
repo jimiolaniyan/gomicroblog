@@ -56,10 +56,10 @@ func (repo *postRepository) FindByID(id PostID) (post, error) {
 	return post{}, ErrPostNotFound
 }
 
-func (repo *postRepository) FindLatestPostsByName(username string) ([]*post, error) {
+func (repo *postRepository) FindLatestPostsForUser(id ID) ([]*post, error) {
 	var posts []*post
 	for i, p := range repo.posts {
-		if p.Author.Username == username {
+		if p.Author.UserID == id {
 			pp := repo.posts[i]
 			posts = append(posts, &pp)
 		}
