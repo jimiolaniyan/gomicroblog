@@ -13,8 +13,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/stretchr/testify/assert"
 )
+
+type HandlerTestSuite struct {
+	suite.Suite
+	userID ID
+	svc    Service
+}
+
+func (hs *HandlerTestSuite) SetupSuite() {
+	hs.svc = NewService(NewUserRepository(), NewPostRepository())
+	id, _ := hs.svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
+	hs.userID = id
+}
 
 func TestDecodeRequest(t *testing.T) {
 	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
@@ -156,10 +170,7 @@ func TestHandlerResponses(t *testing.T) {
 	}
 }
 
-func TestLoginHandler(t *testing.T) {
-	svc := NewService(NewUserRepository(), nil)
-	userID, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
-
+func (hs *HandlerTestSuite) TestLoginHandler() {
 	tests := []struct {
 		description, req       string
 		wantCode, wantTokenLen int
@@ -168,17 +179,17 @@ func TestLoginHandler(t *testing.T) {
 		{"BadRequest", `invalid request`, http.StatusBadRequest, 1, ""},
 		{"NonExistentUser", `{"username": "nonexistent", "password": "password"}`, http.StatusUnauthorized, 1, ""},
 		{"ExistingUserWithInvalidPassword", `{"username": "user", "password": "anInvalid"}`, http.StatusUnauthorized, 1, ""},
-		{"ExistingUserWithValidPassword", `{"username": "user", "password": "password"}`, http.StatusOK, 3, fmt.Sprintf("{\"iss\":\"auth\",\"sub\":\"%s\"}", userID)},
+		{"ExistingUserWithValidPassword", `{"username": "user", "password": "password"}`, http.StatusOK, 3, fmt.Sprintf("{\"iss\":\"auth\",\"sub\":\"%s\"}", hs.userID)},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
+		hs.Run(tt.description, func() {
 			req, err := http.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(tt.req))
-			assert.Nil(t, err)
+			assert.Nil(hs.T(), err)
 
 			w := httptest.NewRecorder()
 			mux := http.NewServeMux()
-			mux.Handle("/v1/auth/login", LoginHandler(svc))
+			mux.Handle("/v1/auth/login", LoginHandler(hs.svc))
 			mux.ServeHTTP(w, req)
 
 			var res struct {
@@ -187,22 +198,20 @@ func TestLoginHandler(t *testing.T) {
 			}
 
 			_ = json.NewDecoder(w.Body).Decode(&res)
-			assert.Equal(t, tt.wantCode, w.Code)
+			assert.Equal(hs.T(), tt.wantCode, w.Code)
 			parts := strings.Split(res.Token, ".")
-			assert.Equal(t, len(parts), tt.wantTokenLen)
+			assert.Equal(hs.T(), len(parts), tt.wantTokenLen)
 
 			if len(parts) > 2 {
 				claim, err := base64.RawStdEncoding.DecodeString(parts[1])
-				assert.Nil(t, err)
-				assert.Equal(t, tt.wantClaims, string(claim))
+				assert.Nil(hs.T(), err)
+				assert.Equal(hs.T(), tt.wantClaims, string(claim))
 			}
 		})
 	}
 }
 
-func TestCreatePostHandler(t *testing.T) {
-	svc := NewService(NewUserRepository(), NewPostRepository())
-	id, _ := svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
+func (hs *HandlerTestSuite) TestCreatePostHandler() {
 
 	tests := []struct {
 		req, userID  string
@@ -216,8 +225,8 @@ func TestCreatePostHandler(t *testing.T) {
 		{`{}`, "", http.StatusInternalServerError, ErrEmptyContext, false, "", false},
 		{`{"body": ""}`, "", http.StatusUnauthorized, ErrInvalidID, false, "", true},
 		{`{"body": ""}`, "puoiwoerigp", http.StatusUnauthorized, ErrInvalidID, false, "", true},
-		{`{"body": ""}`, string(id), http.StatusUnprocessableEntity, ErrEmptyBody, false, "", true},
-		{`{"body": "i love my wife :)"}`, string(id), http.StatusCreated, errors.New(""), true, "/v1/posts/", true},
+		{`{"body": ""}`, string(hs.userID), http.StatusUnprocessableEntity, ErrEmptyBody, false, "", true},
+		{`{"body": "i love my wife :)"}`, string(hs.userID), http.StatusCreated, errors.New(""), true, "/v1/posts/", true},
 	}
 
 	for _, tt := range tests {
@@ -225,7 +234,7 @@ func TestCreatePostHandler(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		mux := http.NewServeMux()
-		mux.Handle("/v1/posts", CreatePostHandler(svc))
+		mux.Handle("/v1/posts", CreatePostHandler(hs.svc))
 
 		if tt.wantCtx {
 			ctx := context.WithValue(r.Context(), idKey, tt.userID)
@@ -241,10 +250,10 @@ func TestCreatePostHandler(t *testing.T) {
 
 		_ = json.NewDecoder(w.Body).Decode(&res)
 
-		assert.Equal(t, tt.wantCode, w.Code)
-		assert.Equal(t, tt.wantErr.Error(), res.Err)
-		assert.Equal(t, IsValidID(string(res.ID)), tt.wantID)
-		assert.True(t, strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
+		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
+		assert.Equal(hs.T(), IsValidID(string(res.ID)), tt.wantID)
+		assert.True(hs.T(), strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
 	}
 
 }
@@ -267,12 +276,13 @@ func TestRequireAuth(t *testing.T) {
 		{authHeader: "Bearer " + validToken, wantCode: http.StatusOK, wantID: "randomid"},
 	}
 
+	var id string
+	f := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id = r.Context().Value(idKey).(string)
+		return
+	})
+
 	for _, tt := range tests {
-		var id string
-		f := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			id = r.Context().Value(idKey).(string)
-			return
-		})
 
 		h := RequireAuth(f)
 		r, _ := http.NewRequest(http.MethodPost, "/v1/posts", nil)
@@ -288,4 +298,8 @@ func TestRequireAuth(t *testing.T) {
 		assert.Equal(t, tt.wantID, id)
 		assert.Equal(t, tt.wantCode, w.Code)
 	}
+}
+
+func TestHandlerSuite(t *testing.T) {
+	suite.Run(t, new(HandlerTestSuite))
 }

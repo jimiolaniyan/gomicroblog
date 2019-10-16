@@ -165,19 +165,17 @@ func (bs *BddTestSuite) TestProfileWithPosts() {
 	})
 }
 
-func TestEditUserProfile(t *testing.T) {
-	Convey("Given a returning user U", t, func() {
-		svc := NewService(NewUserRepository(), NewPostRepository())
-		id, _ := svc.RegisterNewUser(registerUserRequest{"U", "password", "user@app.com"})
+func (bs *BddTestSuite) TestEditUserProfile() {
+	Convey("Given a returning user U", bs.T(), func() {
 
 		Convey("When the user edits his profile", func() {
 			bio := "My wonderful bio"
-			err := svc.EditProfile(id, editProfileRequest{Username: "U2", Bio: bio})
+			err := bs.svc.EditProfile(bs.userID, editProfileRequest{Username: "U2", Bio: bio})
 
 			So(err, ShouldBeNil)
 
 			Convey("Then his profile shows the updated information", func() {
-				user, _ := svc.(*service).users.FindByID(id)
+				user, _ := bs.svc.users.FindByID(bs.userID)
 				So(user.username, ShouldEqual, "U2")
 				So(user.bio, ShouldEqual, bio)
 			})
