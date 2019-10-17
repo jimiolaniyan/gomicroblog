@@ -109,7 +109,7 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 			So(profile, ShouldNotBeNil)
 
 			Convey("Then his profile is as follows", func() {
-				expectedProfile := profileResponse{
+				expectedProfile := Profile{
 					Username: "U",
 					Avatar:   avatar(bs.req.Email),
 					Bio:      "",
@@ -144,7 +144,7 @@ func (bs *BddTestSuite) TestProfileWithPosts() {
 			Convey("Then his profile contains his posts in reverse chronological order", func() {
 
 				av := avatar("user@app.com")
-				expected := profileResponse{
+				expected := Profile{
 					Posts: []*post{
 						{ID: postIDs[2], Author: Author{Username: "U", UserID: bs.userID, Avatar: av}, body: "C", timestamp: profile.Posts[0].timestamp},
 						{ID: postIDs[1], Author: Author{Username: "U", UserID: bs.userID, Avatar: av}, body: "B", timestamp: profile.Posts[1].timestamp},

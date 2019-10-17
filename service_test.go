@@ -159,17 +159,19 @@ func (ts *ServiceTestSuite) TestService_GetUserPosts() {
 }
 
 func (ts *ServiceTestSuite) TestService_GetProfile() {
-	user, _ := ts.svc.users.FindByID(ts.userID)
 
+	av := avatar(ts.req.Email)
+	username := ts.req.Username
 	tests := []struct {
 		username                 string
 		wantErr                  error
 		wantUsername, wantAvatar string
+		wantID                   ID
 		wantJoined, wantLastSeen bool
 	}{
 		{username: "", wantErr: ErrInvalidUsername, wantUsername: ""},
 		{username: "void", wantErr: ErrNotFound, wantUsername: ""},
-		{username: ts.req.Username, wantErr: nil, wantUsername: ts.req.Username, wantAvatar: avatar(ts.req.Email), wantJoined: true, wantLastSeen: true},
+		{username: username, wantErr: nil, wantUsername: username, wantAvatar: av, wantJoined: true, wantLastSeen: true, wantID: ts.user.ID},
 	}
 
 	for _, tt := range tests {
@@ -178,10 +180,11 @@ func (ts *ServiceTestSuite) TestService_GetProfile() {
 		assert.Equal(ts.T(), tt.wantErr, err)
 		assert.Equal(ts.T(), tt.wantUsername, p.Username)
 		assert.Equal(ts.T(), tt.wantAvatar, p.Avatar)
+		assert.Equal(ts.T(), tt.wantID, p.ID)
 
-		if tt.wantJoined || tt.wantLastSeen {
-			assert.Equal(ts.T(), user.createdAt, p.Joined)
-			assert.Equal(ts.T(), user.lastSeen, p.LastSeen)
+		if tt.wantErr == nil {
+			assert.Equal(ts.T(), ts.user.createdAt, p.Joined)
+			assert.Equal(ts.T(), ts.user.lastSeen, p.LastSeen)
 		}
 	}
 }

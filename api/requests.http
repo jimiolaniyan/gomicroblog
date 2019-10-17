@@ -9,6 +9,17 @@ Content-Type: application/json
 
 ###
 
+POST http://localhost:8090/v1/users/new
+Content-Type: application/json
+
+{
+  "username": "user2",
+  "password": "password",
+  "email": "t2@test.com"
+}
+
+###
+
 POST http://localhost:8090/v1/auth/login
 Content-Type: application/json
 
@@ -19,11 +30,16 @@ Content-Type: application/json
 ###
 
 POST http://localhost:8090/v1/posts
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoIiwic3ViIjoiYm1mcHA3cG9qcmljNGs4cHBnczAifQ.6f3R25_4L_YwNUw2NOduEaT2FlOjPf5z0YLqqNqTs7M
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoIiwic3ViIjoiYm1rNjRuaG9qcmlhaWx0ajE0aWcifQ.RtloRA7G7ymITh8lS328g815qO8RP8cYXEf77NLeWlI
 Content-Type: application/json
 
 {
   "body": "a post body"
 }
+
+###
+
+GET http://localhost:8090/v1/users/user
+Accept: application/json
 
 ###

@@ -15,7 +15,7 @@ type Service interface {
 	ValidateUser(req validateUserRequest) (ID, error)
 	CreatePost(id ID, body string) (PostID, error)
 	GetUserPosts(username string) ([]*post, error)
-	GetProfile(username string) (profileResponse, error)
+	GetProfile(username string) (Profile, error)
 	UpdateLastSeen(id ID) error
 	EditProfile(id ID, req editProfileRequest) error
 }
@@ -26,9 +26,9 @@ type service struct {
 }
 
 type registerUserRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	Username string
+	Password string
+	Email    string
 }
 
 type validateUserRequest struct {
@@ -58,14 +58,21 @@ type Relationships struct {
 	Following []user `json:"following"`
 }
 
-type profileResponse struct {
+type Profile struct {
+	ID            ID            `json:"id"`
 	Username      string        `json:"username"`
 	Avatar        string        `json:"avatar_url,omitempty"`
-	Bio           string        `json:"bio,omitempty"`
+	Bio           string        `json:"bio"`
 	Joined        time.Time     `json:"joined"`
 	LastSeen      time.Time     `json:"last_seen"`
 	Relationships Relationships `json:"relationships"`
 	Posts         []*post       `json:"posts"`
+}
+
+type profileResponse struct {
+	Profile *Profile `json:"profile,omitempty"`
+	URL     string   `json:"url"`
+	Err     error    `json:"err,omitempty"`
 }
 
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
@@ -164,21 +171,27 @@ func (svc *service) GetUserPosts(username string) ([]*post, error) {
 	return svc.posts.FindLatestPostsForUser(user.ID)
 }
 
-func (svc *service) GetProfile(username string) (profileResponse, error) {
+func (svc *service) GetProfile(username string) (Profile, error) {
 	if username == "" {
-		return profileResponse{}, ErrInvalidUsername
+		return Profile{}, ErrInvalidUsername
 	}
 
 	user, err := svc.users.FindByName(username)
 	if err != nil {
-		return profileResponse{}, ErrNotFound
+		return Profile{}, ErrNotFound
 	}
 
 	posts, err := svc.posts.FindLatestPostsForUser(user.ID)
+	if err != nil {
+		return Profile{}, errors.New("error finding latest posts")
+	}
 
-	addAuthorInfoToPosts(posts, user)
+	if len(posts) > 0 {
+		addAuthorInfoToPosts(posts, user)
+	}
 
-	return profileResponse{
+	return Profile{
+		ID:       user.ID,
 		Username: username,
 		Avatar:   avatar(user.email),
 		Joined:   user.createdAt,

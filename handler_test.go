@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/julienschmidt/httprouter"
+
 	"github.com/stretchr/testify/suite"
 
 	"github.com/stretchr/testify/assert"
@@ -22,11 +24,13 @@ type HandlerTestSuite struct {
 	suite.Suite
 	userID ID
 	svc    Service
+	req    registerUserRequest
 }
 
 func (hs *HandlerTestSuite) SetupSuite() {
 	hs.svc = NewService(NewUserRepository(), NewPostRepository())
-	id, _ := hs.svc.RegisterNewUser(registerUserRequest{"user", "password", "a@b.com"})
+	hs.req = registerUserRequest{"user", "password", "a@b.com"}
+	id, _ := hs.svc.RegisterNewUser(hs.req)
 	hs.userID = id
 }
 
@@ -72,8 +76,7 @@ func TestHandlerResponses(t *testing.T) {
 		wantLocation string
 		testExisting bool
 	}{
-		{
-			http.MethodPost,
+		{http.MethodPost,
 			registerReq,
 			http.StatusCreated,
 			true,
@@ -212,7 +215,6 @@ func (hs *HandlerTestSuite) TestLoginHandler() {
 }
 
 func (hs *HandlerTestSuite) TestCreatePostHandler() {
-
 	tests := []struct {
 		req, userID  string
 		wantCode     int
@@ -254,6 +256,50 @@ func (hs *HandlerTestSuite) TestCreatePostHandler() {
 		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
 		assert.Equal(hs.T(), IsValidID(string(res.ID)), tt.wantID)
 		assert.True(hs.T(), strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
+	}
+
+}
+
+func (hs *HandlerTestSuite) TestGetProfileHandler() {
+	u := hs.req.Username
+	host := "http://localhost:8080"
+	finalURL := fmt.Sprintf("%s/v1/users/%s", host, u)
+	nilErr := errors.New("")
+
+	tests := []struct {
+		username              string
+		wantCode              int
+		wantErr               error
+		wantID                bool
+		wantUsername, wantURL string
+	}{
+		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr, wantUsername: ""},
+		{username: "nonexistent", wantCode: http.StatusNotFound, wantErr: ErrNotFound, wantUsername: ""},
+		{username: u, wantCode: http.StatusOK, wantErr: nilErr, wantID: true, wantUsername: u, wantURL: finalURL},
+	}
+
+	for _, tt := range tests {
+		url := fmt.Sprintf("%s/v1/users/%s", host, tt.username)
+		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		w := httptest.NewRecorder()
+		router := httprouter.New()
+
+		router.Handler(http.MethodGet, "/v1/users/:username", GetProfileHandler(hs.svc))
+		router.ServeHTTP(w, req)
+
+		var res struct {
+			Profile Profile `json:"profile,omitempty"`
+			URL     string  `json:"url,omitempty"`
+			Err     string  `json:"error,omitempty"`
+		}
+
+		_ = json.NewDecoder(w.Body).Decode(&res)
+
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
+		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
+		assert.Equal(hs.T(), tt.wantID, IsValidID(string(res.Profile.ID)))
+		assert.Equal(hs.T(), tt.wantUsername, res.Profile.Username)
+		assert.Equal(hs.T(), tt.wantURL, res.URL)
 	}
 
 }

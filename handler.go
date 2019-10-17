@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/julienschmidt/httprouter"
+
 	"github.com/dgrijalva/jwt-go"
 )
 
@@ -92,6 +94,30 @@ func CreatePostHandler(svc Service) http.Handler {
 	})
 }
 
+func GetProfileHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		params := httprouter.ParamsFromContext(r.Context())
+		username := strings.TrimSpace(params.ByName("username"))
+
+		w.Header().Set("Content-Type", "application/json")
+		if username == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		p, err := svc.GetProfile(username)
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+
+		if err = json.NewEncoder(w).Encode(profileResponse{Profile: &p, URL: r.URL.String()}); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+
+	})
+}
+
 func RequireAuth(f http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenStr := getTokenFromRequest(r)
@@ -138,6 +164,8 @@ func encodeError(err error, w http.ResponseWriter) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	case ErrInvalidCredentials, ErrInvalidID:
 		w.WriteHeader(http.StatusUnauthorized)
+	case ErrNotFound:
+		w.WriteHeader(http.StatusNotFound)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
