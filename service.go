@@ -59,14 +59,27 @@ type Relationships struct {
 }
 
 type Profile struct {
-	ID            ID            `json:"id"`
-	Username      string        `json:"username"`
-	Avatar        string        `json:"avatar_url,omitempty"`
-	Bio           string        `json:"bio"`
-	Joined        time.Time     `json:"joined"`
-	LastSeen      time.Time     `json:"last_seen"`
-	Relationships Relationships `json:"relationships"`
-	Posts         []*post       `json:"posts"`
+	ID            ID             `json:"id"`
+	Username      string         `json:"username"`
+	Avatar        string         `json:"avatar_url,omitempty"`
+	Bio           string         `json:"bio"`
+	Joined        time.Time      `json:"joined"`
+	LastSeen      time.Time      `json:"last_seen"`
+	Relationships Relationships  `json:"relationships"`
+	Posts         []postResponse `json:"posts"`
+}
+
+type authorResponse struct {
+	UserID   ID     `json:"user_id"`
+	Username string `json:"username"`
+	Avatar   string `json:"avatar"`
+}
+
+type postResponse struct {
+	ID        PostID         `json:"id"`
+	Body      string         `json:"body"`
+	Timestamp time.Time      `json:"timestamp"`
+	Author    authorResponse `json:"author"`
 }
 
 type profileResponse struct {
@@ -186,17 +199,13 @@ func (svc *service) GetProfile(username string) (Profile, error) {
 		return Profile{}, errors.New("error finding latest posts")
 	}
 
-	if len(posts) > 0 {
-		addAuthorInfoToPosts(posts, user)
-	}
-
 	return Profile{
 		ID:       user.ID,
 		Username: username,
 		Avatar:   avatar(user.email),
 		Joined:   user.createdAt,
 		LastSeen: user.lastSeen,
-		Posts:    posts,
+		Posts:    buildPostResponses(posts, user),
 	}, nil
 }
 
@@ -218,11 +227,25 @@ func (svc *service) UpdateLastSeen(id ID) error {
 	return nil
 }
 
-func addAuthorInfoToPosts(posts []*post, user *user) {
+func buildPostResponses(posts []*post, user *user) []postResponse {
+	var res []postResponse
+
 	for _, p := range posts {
-		p.Author.Avatar = avatar(user.email)
-		p.Author.Username = user.username
+		pr := postResponse{
+			ID:        p.ID,
+			Body:      p.body,
+			Timestamp: p.timestamp,
+			Author: authorResponse{
+				UserID:   user.ID,
+				Username: user.username,
+				Avatar:   avatar(user.email),
+			},
+		}
+
+		res = append(res, pr)
 	}
+
+	return res
 }
 
 func avatar(email string) string {

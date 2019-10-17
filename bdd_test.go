@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/smartystreets/goconvey/convey"
 	"github.com/stretchr/testify/suite"
 )
@@ -12,34 +14,38 @@ type BddTestSuite struct {
 	suite.Suite
 	svc    service
 	req    registerUserRequest
+	now    time.Time
 	userID ID
+	user   *user
 }
 
 func (bs *BddTestSuite) SetupSuite() {
+	bs.now = time.Now().UTC()
 	bs.svc = service{users: NewUserRepository(), posts: NewPostRepository()}
 	bs.req = registerUserRequest{"U", "password", "user@app.com"}
 
 	id, _ := bs.svc.RegisterNewUser(bs.req)
 	bs.userID = id
+
+	user, _ := bs.svc.users.FindByID(id)
+	bs.user = user
 }
 
-func (bs *BddTestSuite) TestRegisterNewUser(t *testing.T) {
-	Convey("Given new user with username, email and password", t, func() {
+func (bs *BddTestSuite) TearDownTest() {
+	bs.svc.posts = NewPostRepository()
+}
+
+func (bs *BddTestSuite) TestRegisterNewUser() {
+	Convey("Given new user with username, email and password", bs.T(), func() {
+		req := registerUserRequest{"user", "password", "user@user.com"}
 
 		Convey("When user registers", func() {
-			userID, err := bs.svc.RegisterNewUser(bs.req)
+			userID, err := bs.svc.RegisterNewUser(req)
 
-			var created bool
-			if err != nil {
-				created = false
-			} else {
-				created = true
-			}
-
-			So(created, ShouldEqual, true)
+			So(err, ShouldBeNil)
 
 			Convey("Then the created user has username", func() {
-				dbUser, err := bs.svc.users.FindByName(bs.req.Username)
+				dbUser, err := bs.svc.users.FindByName(req.Username)
 
 				So(err, ShouldBeNil)
 				So(userID, ShouldEqual, dbUser.ID)
@@ -63,7 +69,7 @@ func (bs *BddTestSuite) TestLoginUser() {
 				So(IsValidID(string(userID)), ShouldEqual, true)
 
 				Convey("Then the U is successfully validated", func() {
-					dbUser, err := bs.svc.users.FindByName(req.Username)
+					dbUser, err := bs.svc.users.FindByName(bs.req.Username)
 					So(err, ShouldBeNil)
 					So(userID, ShouldEqual, dbUser.ID)
 				})
@@ -86,7 +92,7 @@ func (bs *BddTestSuite) TestPostCreation() {
 				p := &post{}
 
 				for _, post := range posts {
-					if post.Author.Username == "U" && post.body == body {
+					if post.Author.UserID == bs.userID && post.body == body {
 						p = post
 					}
 				}
@@ -101,7 +107,6 @@ func (bs *BddTestSuite) TestPostCreation() {
 
 func (bs *BddTestSuite) TestProfileWithNoPosts() {
 	Convey("Given a newly registered user U with no posts", bs.T(), func() {
-		now := time.Now().UTC()
 
 		Convey("When his profile is requested", func() {
 			profile, err := bs.svc.GetProfile(bs.req.Username)
@@ -110,6 +115,7 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 
 			Convey("Then his profile is as follows", func() {
 				expectedProfile := Profile{
+					ID:       bs.userID,
 					Username: "U",
 					Avatar:   avatar(bs.req.Email),
 					Bio:      "",
@@ -118,8 +124,8 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 				}
 
 				So(profile, ShouldResemble, expectedProfile)
-				So(profile.Joined.After(now), ShouldBeTrue)
-				So(profile.LastSeen.After(now), ShouldBeTrue)
+				So(profile.Joined.After(bs.now), ShouldBeTrue)
+				So(profile.LastSeen.After(bs.now), ShouldBeTrue)
 			})
 
 		})
@@ -145,10 +151,10 @@ func (bs *BddTestSuite) TestProfileWithPosts() {
 
 				av := avatar("user@app.com")
 				expected := Profile{
-					Posts: []*post{
-						{ID: postIDs[2], Author: Author{Username: "U", UserID: bs.userID, Avatar: av}, body: "C", timestamp: profile.Posts[0].timestamp},
-						{ID: postIDs[1], Author: Author{Username: "U", UserID: bs.userID, Avatar: av}, body: "B", timestamp: profile.Posts[1].timestamp},
-						{ID: postIDs[0], Author: Author{Username: "U", UserID: bs.userID, Avatar: av}, body: "A", timestamp: profile.Posts[2].timestamp},
+					Posts: []postResponse{
+						{ID: postIDs[2], Author: authorResponse{Username: "U", UserID: bs.userID, Avatar: av}, Body: "C", Timestamp: profile.Posts[0].Timestamp},
+						{ID: postIDs[1], Author: authorResponse{Username: "U", UserID: bs.userID, Avatar: av}, Body: "B", Timestamp: profile.Posts[1].Timestamp},
+						{ID: postIDs[0], Author: authorResponse{Username: "U", UserID: bs.userID, Avatar: av}, Body: "A", Timestamp: profile.Posts[2].Timestamp},
 					},
 				}
 
@@ -167,20 +173,29 @@ func (bs *BddTestSuite) TestProfileWithPosts() {
 
 func (bs *BddTestSuite) TestEditUserProfile() {
 	Convey("Given a returning user U", bs.T(), func() {
+		existingUser := *bs.user
+		existingUser.ID = nextID()
+		existingUser.username = "newUsername"
+
+		err := bs.svc.users.Store(&existingUser)
+		assert.Nil(bs.T(), err)
 
 		Convey("When the user edits his profile", func() {
 			bio := "My wonderful bio"
-			err := bs.svc.EditProfile(bs.userID, editProfileRequest{Username: "U2", Bio: bio})
+			err := bs.svc.EditProfile(existingUser.ID, editProfileRequest{Username: "U2", Bio: bio})
 
 			So(err, ShouldBeNil)
 
 			Convey("Then his profile shows the updated information", func() {
-				user, _ := bs.svc.users.FindByID(bs.userID)
-				So(user.username, ShouldEqual, "U2")
-				So(user.bio, ShouldEqual, bio)
+				So(existingUser.username, ShouldEqual, "U2")
+				So(existingUser.bio, ShouldEqual, bio)
 			})
 		})
 	})
+}
+
+func TestBddSuite(t *testing.T) {
+	suite.Run(t, new(BddTestSuite))
 }
 
 func createPosts(id ID, svc service) (ids []PostID, ok bool) {

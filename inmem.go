@@ -1,6 +1,8 @@
 package gomicroblog
 
-import "sort"
+import (
+	"sort"
+)
 
 type userRepository struct {
 	users map[ID]*user
