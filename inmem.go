@@ -59,6 +59,7 @@ func (repo *postRepository) FindByID(id PostID) (post, error) {
 }
 
 func (repo *postRepository) FindLatestPostsForUser(id ID) ([]*post, error) {
+	//fmt.Println(id)
 	var posts []*post
 	for i, p := range repo.posts {
 		if p.Author.UserID == id {

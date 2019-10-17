@@ -182,12 +182,13 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 
 		Convey("When the user edits his profile", func() {
 			bio := "My wonderful bio"
-			err := bs.svc.EditProfile(existingUser.ID, editProfileRequest{Username: "U2", Bio: bio})
+			newU := "U2"
+			err := bs.svc.EditProfile(existingUser.ID, editProfileRequest{Username: &newU, Bio: &bio})
 
 			So(err, ShouldBeNil)
 
 			Convey("Then his profile shows the updated information", func() {
-				So(existingUser.username, ShouldEqual, "U2")
+				So(existingUser.username, ShouldEqual, newU)
 				So(existingUser.bio, ShouldEqual, bio)
 			})
 		})

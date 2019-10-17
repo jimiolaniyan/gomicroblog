@@ -40,8 +40,8 @@ type createPostRequest struct {
 }
 
 type editProfileRequest struct {
-	Username string
-	Bio      string
+	Username *string
+	Bio      *string
 }
 
 type registerUserResponse struct {
@@ -209,6 +209,56 @@ func (svc *service) GetProfile(username string) (Profile, error) {
 	}, nil
 }
 
+func (svc *service) EditProfile(id ID, req editProfileRequest) error {
+	if req.Username == nil && req.Bio == nil {
+		return nil
+	}
+
+	if !IsValidID(string(id)) {
+		return ErrInvalidID
+	}
+
+	user, err := svc.users.FindByID(id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	if req.Username != nil {
+		if err := svc.updateUsername(req.Username, user); err != nil {
+			return err
+		}
+	}
+
+	if req.Bio != nil {
+		if err := updateBio(req.Bio, user); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (svc *service) updateUsername(username *string, user *user) error {
+	u := strings.TrimSpace(*username)
+	if u == "" {
+		return ErrInvalidUsername
+	}
+	if user, _ := svc.users.FindByName(u); user != nil {
+		return ErrExistingUsername
+	}
+	user.username = u
+	return nil
+}
+
+func updateBio(bio *string, user *user) error {
+	b := strings.TrimSpace(*bio)
+	if len(b) > 140 {
+		return ErrBioTooLong
+	}
+	user.bio = b
+	return nil
+}
+
 func (svc *service) UpdateLastSeen(id ID) error {
 	if !IsValidID(string(id)) {
 		return ErrNotFound
@@ -251,31 +301,6 @@ func buildPostResponses(posts []*post, user *user) []postResponse {
 func avatar(email string) string {
 	digest := fmt.Sprintf("%x", md5.Sum([]byte(email)))
 	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?d=identicon", digest)
-}
-
-func (svc *service) EditProfile(id ID, req editProfileRequest) error {
-	if !IsValidID(string(id)) {
-		return ErrInvalidID
-	}
-
-	if req.Username == "" {
-		return ErrInvalidUsername
-	}
-
-	bio := strings.TrimSpace(req.Bio)
-	if len(bio) > 140 {
-		return ErrBioTooLong
-	}
-
-	user, err := svc.users.FindByID(id)
-	if err != nil {
-		return ErrNotFound
-	}
-
-	user.username = req.Username
-	user.bio = bio
-
-	return nil
 }
 
 func NewService(users Repository, posts PostRepository) Service {

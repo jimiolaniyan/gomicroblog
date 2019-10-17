@@ -148,7 +148,7 @@ func (ts *ServiceTestSuite) TestService_GetUserPosts() {
 	}{
 		{wantErr: ErrInvalidUsername},
 		{username: "void", wantErr: ErrNotFound},
-		{username: "username", wantErr: nil, wantPostsLen: 1},
+		{username: ts.req.Username, wantErr: nil, wantPostsLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -211,37 +211,53 @@ func (ts *ServiceTestSuite) TestService_UpdateLastSeen() {
 }
 
 func (ts *ServiceTestSuite) TestEditProfile() {
-	r := editProfileRequest{Username: "U", Bio: "My new bio"}
+	// get a new so we don't update the user in the suite
+	newUser := *ts.user
+	newUser.ID = nextID()
+	origUN := newUser.username
+	bio := newUser.bio
+	err := ts.svc.users.Store(&newUser)
+	assert.Nil(ts.T(), err)
+
+	b := "My new bio"
 	longBio := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut " +
 		"labore et dolore magna aliqua. Ut enim ad minim h"
 
-	newUser := *ts.user
-	newUser.ID = nextID()
-	newUser.username = "newUsername"
+	emptyUsernameReq := editProfileRequest{Username: new(string)}
 
-	err := ts.svc.users.Store(&newUser)
-	assert.Nil(ts.T(), err)
+	u := "U"
 
 	tests := []struct {
 		id      ID
 		req     editProfileRequest
 		wantErr error
+		wantBio string
+		wantUN  string
 	}{
-		{wantErr: ErrInvalidID},
-		{id: nextID(), wantErr: ErrInvalidUsername},
-		{id: nextID(), req: r, wantErr: ErrNotFound},
-		{id: newUser.ID, req: editProfileRequest{"U", longBio}, wantErr: ErrBioTooLong},
-		{id: newUser.ID, req: r, wantErr: nil},
+		{wantErr: nil, wantUN: origUN, wantBio: bio},
+		{req: emptyUsernameReq, wantErr: ErrInvalidID},
+		{id: nextID(), req: emptyUsernameReq, wantErr: ErrNotFound},
+		{id: newUser.ID, req: emptyUsernameReq, wantErr: ErrInvalidUsername},
+		{id: newUser.ID, req: editProfileRequest{Username: &ts.req.Username}, wantErr: ErrExistingUsername},
+		{id: newUser.ID, req: editProfileRequest{Username: &u}, wantErr: nil, wantUN: u, wantBio: bio},
+		{id: newUser.ID, req: editProfileRequest{Bio: &longBio}, wantErr: ErrBioTooLong, wantBio: bio, wantUN: origUN},
+		{id: newUser.ID, req: editProfileRequest{Bio: new(string)}, wantErr: nil, wantBio: "", wantUN: origUN},
+		{id: newUser.ID, req: editProfileRequest{Bio: &b}, wantErr: nil, wantBio: b, wantUN: origUN},
+		{id: newUser.ID, req: editProfileRequest{Username: &u, Bio: &b}, wantErr: nil, wantBio: b, wantUN: u},
 	}
 
 	for _, tt := range tests {
 		err := ts.svc.EditProfile(tt.id, tt.req)
 		assert.Equal(ts.T(), tt.wantErr, err)
 
-		if tt.wantErr == nil {
-			assert.Equal(ts.T(), tt.req.Username, newUser.username)
-			assert.Equal(ts.T(), tt.req.Bio, newUser.bio)
+		if err == nil {
+			assert.Equal(ts.T(), tt.wantUN, newUser.username)
+			assert.Equal(ts.T(), tt.wantBio, newUser.bio)
 		}
+
+		// reset
+		newUser.username = origUN
+		newUser.bio = bio
 	}
 }
 
