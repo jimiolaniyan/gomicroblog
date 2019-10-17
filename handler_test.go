@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
 
@@ -304,7 +305,7 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 
 }
 
-func TestRequireAuth(t *testing.T) {
+func TestRequireAuthMiddleware(t *testing.T) {
 	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"
 	validToken, _ := getJWTToken("randomid")
 
@@ -343,6 +344,53 @@ func TestRequireAuth(t *testing.T) {
 		assert.IsType(t, new(http.Handler), &h)
 		assert.Equal(t, tt.wantID, id)
 		assert.Equal(t, tt.wantCode, w.Code)
+	}
+}
+
+func (hs *HandlerTestSuite) TestLastSeenMiddleware() {
+	now := time.Now().UTC()
+	var called bool
+	f := func(w http.ResponseWriter, r *http.Request) {
+		if id, _ := getUserIDFromContext(r.Context()); id != "" {
+			called = true
+		}
+	}
+	l := LastSeenMiddleware(http.HandlerFunc(f), hs.svc)
+	r, _ := http.NewRequest("", "/doesnt-matter", nil)
+	pr, _ := http.NewRequest(http.MethodGet, "/v1/users/user", nil)
+
+	tests := []struct {
+		id                          string
+		wantCode                    int
+		withCtx, wantLS, wantCalled bool
+	}{
+		{wantCode: http.StatusInternalServerError},
+		{id: "invalid", withCtx: true, wantCode: http.StatusNotFound},
+		{id: string(hs.userID), withCtx: true, wantCode: http.StatusOK, wantLS: true, wantCalled: true},
+	}
+
+	for _, tt := range tests {
+		if tt.withCtx {
+			r = r.WithContext(context.WithValue(r.Context(), idKey, tt.id))
+		}
+
+		w := httptest.NewRecorder()
+		router := httprouter.New()
+		router.Handler(http.MethodGet, "/doesnt-matter", l)
+		router.Handler(http.MethodGet, "/v1/users/:username", GetProfileHandler(hs.svc))
+		router.ServeHTTP(w, r)
+		router.ServeHTTP(w, pr)
+
+		var res struct {
+			Profile Profile `json:"profile,omitempty"`
+		}
+
+		_ = json.NewDecoder(w.Body).Decode(&res)
+
+		assert.IsType(hs.T(), new(http.Handler), &l)
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
+		assert.Equal(hs.T(), tt.wantCalled, called)
+		assert.Equal(hs.T(), tt.wantLS, res.Profile.LastSeen.After(now))
 	}
 }
 

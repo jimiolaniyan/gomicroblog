@@ -211,7 +211,7 @@ func (svc *service) GetProfile(username string) (Profile, error) {
 
 func (svc *service) UpdateLastSeen(id ID) error {
 	if !IsValidID(string(id)) {
-		return ErrInvalidID
+		return ErrNotFound
 	}
 
 	user, err := svc.users.FindByID(id)

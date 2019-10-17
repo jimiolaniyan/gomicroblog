@@ -72,11 +72,12 @@ func CreatePostHandler(svc Service) http.Handler {
 			return
 		}
 
-		userID, ok := r.Context().Value(idKey).(string)
+		userID, ok := getUserIDFromContext(r.Context())
 		if !ok {
 			encodeError(ErrEmptyContext, w)
 			return
 		}
+
 		req := request.(createPostRequest)
 		postId, err := svc.CreatePost(ID(userID), req.Body)
 
@@ -118,6 +119,23 @@ func GetProfileHandler(svc Service) http.Handler {
 	})
 }
 
+func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, ok := getUserIDFromContext(r.Context())
+		if !ok {
+			encodeError(ErrEmptyContext, w)
+			return
+		}
+
+		err := svc.UpdateLastSeen(ID(id))
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+		f.ServeHTTP(w, r)
+	})
+}
+
 func RequireAuth(f http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenStr := getTokenFromRequest(r)
@@ -139,6 +157,11 @@ func RequireAuth(f http.Handler) http.Handler {
 
 		f.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func getUserIDFromContext(ctx context.Context) (id string, ok bool) {
+	id, ok = ctx.Value(idKey).(string)
+	return
 }
 
 func getTokenFromRequest(r *http.Request) string {

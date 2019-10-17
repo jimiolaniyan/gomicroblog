@@ -30,7 +30,7 @@ Content-Type: application/json
 ###
 
 POST http://localhost:8090/v1/posts
-Authorization: Bearer <enter.token.here>
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoIiwic3ViIjoiYm1rOWJqcG9qcmlhMXRyZ3V0bWcifQ.gSS6yv3hw0nIPrUAkTI-L1Q9TYNGjx6jlG33Bhs6hu0
 Content-Type: application/json
 
 {
@@ -40,6 +40,7 @@ Content-Type: application/json
 ###
 
 GET http://localhost:8090/v1/users/user
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhdXRoIiwic3ViIjoiYm1rOWJqcG9qcmlhMXRyZ3V0bWcifQ.gSS6yv3hw0nIPrUAkTI-L1Q9TYNGjx6jlG33Bhs6hu0
 Accept: application/json
 
 ###

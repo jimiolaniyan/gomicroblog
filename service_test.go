@@ -195,7 +195,7 @@ func (ts *ServiceTestSuite) TestService_UpdateLastSeen() {
 		wantErr error
 		wantLS  bool
 	}{
-		{wantErr: ErrInvalidID},
+		{wantErr: ErrNotFound},
 		{userID: nextID(), wantErr: ErrNotFound},
 		{userID: ts.userID, wantLS: true},
 	}
