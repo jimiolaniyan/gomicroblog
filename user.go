@@ -2,9 +2,11 @@ package gomicroblog
 
 import (
 	"errors"
+	"strings"
+	"time"
+
 	"github.com/rs/xid"
 	"golang.org/x/crypto/bcrypt"
-	"strings"
 )
 
 type Repository interface {
@@ -12,6 +14,7 @@ type Repository interface {
 	Store(u *user) error
 	FindByEmail(e string) (*user, error)
 	FindByID(id ID) (*user, error)
+	Delete(id ID) error
 }
 
 type ID string
@@ -20,10 +23,13 @@ type ID string
 //  and email to a credentials value object
 //  as part of an auth service
 type user struct {
-	ID       ID
-	username string
-	password string
-	email    string
+	ID        ID
+	username  string
+	password  string
+	email     string
+	createdAt time.Time
+	lastSeen  time.Time
+	bio       string
 }
 
 var (
@@ -35,6 +41,7 @@ var (
 	ErrExistingUsername   = errors.New("username in use")
 	ErrExistingEmail      = errors.New("email in use")
 	ErrInvalidCredentials = errors.New("invalid username or password")
+	ErrBioTooLong         = errors.New("bio cannot be more than 140 characters")
 )
 
 func NewUser(username, email string) (*user, error) {

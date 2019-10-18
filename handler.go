@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/julienschmidt/httprouter"
+
+	"github.com/dgrijalva/jwt-go"
 )
 
 type key string
@@ -69,11 +72,12 @@ func CreatePostHandler(svc Service) http.Handler {
 			return
 		}
 
-		userID, ok := r.Context().Value(idKey).(string)
+		userID, ok := getUserIDFromContext(r.Context())
 		if !ok {
 			encodeError(ErrEmptyContext, w)
 			return
 		}
+
 		req := request.(createPostRequest)
 		postId, err := svc.CreatePost(ID(userID), req.Body)
 
@@ -88,6 +92,70 @@ func CreatePostHandler(svc Service) http.Handler {
 		if err := json.NewEncoder(w).Encode(&createPostResponse{ID: postId}); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
+	})
+}
+
+func GetProfileHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		params := httprouter.ParamsFromContext(r.Context())
+		username := strings.TrimSpace(params.ByName("username"))
+
+		w.Header().Set("Content-Type", "application/json")
+		if username == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		p, err := svc.GetProfile(username)
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+
+		if err = json.NewEncoder(w).Encode(profileResponse{Profile: &p, URL: r.URL.String()}); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+
+	})
+}
+
+func EditProfileHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		request, err := decodeEditProfileRequest(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		id, ok := getUserIDFromContext(r.Context())
+		if !ok {
+			encodeError(ErrEmptyContext, w)
+			return
+		}
+
+		err = svc.EditProfile(ID(id), request.(editProfileRequest))
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+	})
+}
+
+func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id, ok := getUserIDFromContext(r.Context())
+		if !ok {
+			encodeError(ErrEmptyContext, w)
+			return
+		}
+
+		err := svc.UpdateLastSeen(ID(id))
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+		f.ServeHTTP(w, r)
 	})
 }
 
@@ -114,6 +182,11 @@ func RequireAuth(f http.Handler) http.Handler {
 	})
 }
 
+func getUserIDFromContext(ctx context.Context) (id string, ok bool) {
+	id, ok = ctx.Value(idKey).(string)
+	return
+}
+
 func getTokenFromRequest(r *http.Request) string {
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 	parts := strings.Split(authHeader, " ")
@@ -133,10 +206,12 @@ func encodeError(err error, w http.ResponseWriter) {
 	switch err {
 	case ErrExistingUsername, ErrExistingEmail:
 		w.WriteHeader(http.StatusConflict)
-	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername:
+	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername, ErrBioTooLong:
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	case ErrInvalidCredentials, ErrInvalidID:
 		w.WriteHeader(http.StatusUnauthorized)
+	case ErrNotFound:
+		w.WriteHeader(http.StatusNotFound)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -168,6 +243,14 @@ func decodeCreatePostRequest(body io.ReadCloser) (interface{}, error) {
 	req := createPostRequest{}
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
 		return createPostRequest{}, err
+	}
+	return req, nil
+}
+
+func decodeEditProfileRequest(body io.ReadCloser) (interface{}, error) {
+	req := editProfileRequest{}
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return editProfileRequest{}, err
 	}
 	return req, nil
 }

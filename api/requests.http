@@ -1,0 +1,57 @@
+POST http://localhost:8090/v1/users/new
+Content-Type: application/json
+
+{
+  "username": "user",
+  "password": "password",
+  "email": "t@test.com"
+}
+
+###
+
+POST http://localhost:8090/v1/users/new
+Content-Type: application/json
+
+{
+  "username": "user2",
+  "password": "password",
+  "email": "t2@test.com"
+}
+
+###
+
+POST http://localhost:8090/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "user",
+  "password": "password"
+}
+###
+
+POST http://localhost:8090/v1/posts
+Authorization: Bearer <token.goes.here>
+Content-Type: application/json
+
+{
+  "body": "a post body"
+}
+
+###
+
+GET http://localhost:8090/v1/users/user
+Authorization: Bearer <token.goes.here>
+Accept: application/json
+
+###
+
+PATCH http://localhost:8090/v1/users
+Authorization: Bearer <token.goes.here>
+Content-Type: application/json
+
+{
+  "username": "user3",
+  "bio": "Bios"
+}
+
+###

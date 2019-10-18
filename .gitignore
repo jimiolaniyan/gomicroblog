@@ -28,5 +28,8 @@ cmake-build-release/
 # Editor-based Rest Client
 .idea/httpRequests
 notes.md
+*.prof
+*.png
+*.test
 vendor
 blog

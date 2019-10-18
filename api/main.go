@@ -1,22 +1,24 @@
 package main
 
 import (
-	blog "github.com/jimiolaniyan/gomicroblog"
 	"log"
 	"net/http"
+
+	"github.com/julienschmidt/httprouter"
+
+	. "github.com/jimiolaniyan/gomicroblog"
 )
 
 func main() {
-	users := blog.NewUserRepository()
-	posts := blog.NewPostRepository()
-	svc := blog.NewService(users, posts)
+	svc := NewService(NewUserRepository(), NewPostRepository())
 
-	mux := http.NewServeMux()
-	mux.Handle("/v1/users/new", blog.RegisterUserHandler(svc))
-	mux.Handle("/v1/auth/login", blog.LoginHandler(svc))
-	mux.Handle("/v1/posts", blog.RequireAuth(blog.CreatePostHandler(svc)))
+	router := httprouter.New()
+	router.Handler(http.MethodPost, "/v1/users/new", RegisterUserHandler(svc))
+	router.Handler(http.MethodPost, "/v1/auth/login", LoginHandler(svc))
+	router.Handler(http.MethodPost, "/v1/posts", RequireAuth(LastSeenMiddleware(CreatePostHandler(svc), svc)))
+	router.Handler(http.MethodGet, "/v1/users/:username", RequireAuth(LastSeenMiddleware(GetProfileHandler(svc), svc)))
+	router.Handler(http.MethodPatch, "/v1/users", RequireAuth(LastSeenMiddleware(EditProfileHandler(svc), svc)))
 
-	port := "8090"
-	log.Printf("Listening on port: %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Printf("Server started. Listening on port: %s\n", "8090")
+	log.Fatal(http.ListenAndServe(":"+("8090"), router))
 }

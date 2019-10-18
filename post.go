@@ -11,9 +11,9 @@ var (
 )
 
 type PostRepository interface {
-	FindByID(id PostID) (*post, error)
-	Store(post *post) error
-	FindPostsByName(username string) ([]*post, error)
+	FindByID(id PostID) (post, error)
+	Store(post post) error
+	FindLatestPostsForUser(id ID) ([]*post, error)
 }
 
 type PostID string
@@ -21,6 +21,7 @@ type PostID string
 type Author struct {
 	UserID   ID
 	Username string
+	Avatar   string
 }
 
 type post struct {
