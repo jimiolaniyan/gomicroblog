@@ -159,26 +159,26 @@ func (ts *ServiceTestSuite) TestService_GetUserPosts() {
 }
 
 func (ts *ServiceTestSuite) TestService_GetProfile() {
-
 	av := avatar(ts.req.Email)
-	username := ts.req.Username
+	u := ts.req.Username
+
 	tests := []struct {
-		username                 string
-		wantErr                  error
-		wantUsername, wantAvatar string
-		wantID                   ID
-		wantJoined, wantLastSeen bool
+		username           string
+		wantErr            error
+		wantUN, wantAvatar string
+		wantID             ID
+		wantJ, wantLS      bool
 	}{
-		{username: "", wantErr: ErrInvalidUsername, wantUsername: ""},
-		{username: "void", wantErr: ErrNotFound, wantUsername: ""},
-		{username: username, wantErr: nil, wantUsername: username, wantAvatar: av, wantJoined: true, wantLastSeen: true, wantID: ts.user.ID},
+		{username: "", wantErr: ErrInvalidUsername, wantUN: ""},
+		{username: "void", wantErr: ErrNotFound, wantUN: ""},
+		{username: u, wantErr: nil, wantUN: u, wantAvatar: av, wantJ: true, wantLS: true, wantID: ts.user.ID},
 	}
 
 	for _, tt := range tests {
 		p, err := ts.svc.GetProfile(tt.username)
 
 		assert.Equal(ts.T(), tt.wantErr, err)
-		assert.Equal(ts.T(), tt.wantUsername, p.Username)
+		assert.Equal(ts.T(), tt.wantUN, p.Username)
 		assert.Equal(ts.T(), tt.wantAvatar, p.Avatar)
 		assert.Equal(ts.T(), tt.wantID, p.ID)
 
@@ -211,12 +211,13 @@ func (ts *ServiceTestSuite) TestService_UpdateLastSeen() {
 }
 
 func (ts *ServiceTestSuite) TestEditProfile() {
-	// get a new so we don't update the user in the suite
-	newUser := *ts.user
-	newUser.ID = nextID()
-	origUN := newUser.username
-	bio := newUser.bio
-	err := ts.svc.users.Store(&newUser)
+	// get a temporary user so we don't update the user in the suite
+	tempUser := *ts.user
+	tempUser.ID = nextID()
+	origUN := "newUsername"
+	tempUser.username = origUN
+	bio := tempUser.bio
+	err := ts.svc.users.Store(&tempUser)
 	assert.Nil(ts.T(), err)
 
 	b := "My new bio"
@@ -237,13 +238,13 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 		{wantErr: nil, wantUN: origUN, wantBio: bio},
 		{req: emptyUsernameReq, wantErr: ErrInvalidID},
 		{id: nextID(), req: emptyUsernameReq, wantErr: ErrNotFound},
-		{id: newUser.ID, req: emptyUsernameReq, wantErr: ErrInvalidUsername},
-		{id: newUser.ID, req: editProfileRequest{Username: &ts.req.Username}, wantErr: ErrExistingUsername},
-		{id: newUser.ID, req: editProfileRequest{Username: &u}, wantErr: nil, wantUN: u, wantBio: bio},
-		{id: newUser.ID, req: editProfileRequest{Bio: &longBio}, wantErr: ErrBioTooLong, wantBio: bio, wantUN: origUN},
-		{id: newUser.ID, req: editProfileRequest{Bio: new(string)}, wantErr: nil, wantBio: "", wantUN: origUN},
-		{id: newUser.ID, req: editProfileRequest{Bio: &b}, wantErr: nil, wantBio: b, wantUN: origUN},
-		{id: newUser.ID, req: editProfileRequest{Username: &u, Bio: &b}, wantErr: nil, wantBio: b, wantUN: u},
+		{id: tempUser.ID, req: emptyUsernameReq, wantErr: ErrInvalidUsername},
+		{id: tempUser.ID, req: editProfileRequest{Username: &ts.req.Username}, wantErr: ErrExistingUsername},
+		{id: tempUser.ID, req: editProfileRequest{Username: &u}, wantErr: nil, wantUN: u, wantBio: bio},
+		{id: tempUser.ID, req: editProfileRequest{Bio: &longBio}, wantErr: ErrBioTooLong, wantBio: bio, wantUN: origUN},
+		{id: tempUser.ID, req: editProfileRequest{Bio: new(string)}, wantErr: nil, wantBio: "", wantUN: origUN},
+		{id: tempUser.ID, req: editProfileRequest{Bio: &b}, wantErr: nil, wantBio: b, wantUN: origUN},
+		{id: tempUser.ID, req: editProfileRequest{Username: &u, Bio: &b}, wantErr: nil, wantBio: b, wantUN: u},
 	}
 
 	for _, tt := range tests {
@@ -251,14 +252,16 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 		assert.Equal(ts.T(), tt.wantErr, err)
 
 		if err == nil {
-			assert.Equal(ts.T(), tt.wantUN, newUser.username)
-			assert.Equal(ts.T(), tt.wantBio, newUser.bio)
+			assert.Equal(ts.T(), tt.wantUN, tempUser.username)
+			assert.Equal(ts.T(), tt.wantBio, tempUser.bio)
 		}
 
 		// reset
-		newUser.username = origUN
-		newUser.bio = bio
+		tempUser.username = origUN
+		tempUser.bio = bio
 	}
+
+	_ = ts.svc.users.Delete(tempUser.ID)
 }
 
 func (ts *ServiceTestSuite) TestNewService() {

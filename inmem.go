@@ -8,6 +8,14 @@ type userRepository struct {
 	users map[ID]*user
 }
 
+func (repo *userRepository) Delete(id ID) error {
+	if _, ok := repo.users[id]; !ok {
+		return ErrNotFound
+	}
+	delete(repo.users, id)
+	return nil
+}
+
 func (repo *userRepository) FindByID(id ID) (*user, error) {
 	if u, ok := repo.users[id]; ok {
 		return u, nil
