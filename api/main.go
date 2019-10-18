@@ -17,6 +17,7 @@ func main() {
 	router.Handler(http.MethodPost, "/v1/auth/login", LoginHandler(svc))
 	router.Handler(http.MethodPost, "/v1/posts", RequireAuth(LastSeenMiddleware(CreatePostHandler(svc), svc)))
 	router.Handler(http.MethodGet, "/v1/users/:username", RequireAuth(LastSeenMiddleware(GetProfileHandler(svc), svc)))
+	router.Handler(http.MethodPatch, "/v1/users", RequireAuth(LastSeenMiddleware(EditProfileHandler(svc), svc)))
 
 	log.Printf("Server started. Listening on port: %s\n", "8090")
 	log.Fatal(http.ListenAndServe(":"+("8090"), router))

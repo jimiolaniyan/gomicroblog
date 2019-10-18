@@ -39,6 +39,7 @@ func TestDecodeRequest(t *testing.T) {
 	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
 	loginReq := `{"username": "jimi", "password": "password1"}`
 	createPostReq := `{"body": "a simple post"}`
+	u := "new"
 	tests := []struct {
 		r       string
 		decoder func(closer io.ReadCloser) (interface{}, error)
@@ -48,6 +49,9 @@ func TestDecodeRequest(t *testing.T) {
 		{registerReq, decodeRegisterUserRequest, nil, registerUserRequest{"jimi", "password1", "test@tester.test"}},
 		{loginReq, decodeValidateUserRequest, nil, validateUserRequest{"jimi", "password1"}},
 		{createPostReq, decodeCreatePostRequest, nil, createPostRequest{"a simple post"}},
+		{`{}`, decodeEditProfileRequest, nil, editProfileRequest{nil, nil}},
+		{`{"username": "", "bio": ""}`, decodeEditProfileRequest, nil, editProfileRequest{new(string), new(string)}},
+		{`{"username": "new", "bio": "new"}`, decodeEditProfileRequest, nil, editProfileRequest{&u, &u}},
 	}
 
 	for _, tt := range tests {
@@ -175,6 +179,7 @@ func TestHandlerResponses(t *testing.T) {
 }
 
 func (hs *HandlerTestSuite) TestLoginHandler() {
+	validClaims := fmt.Sprintf("{\"iss\":\"auth\",\"sub\":\"%s\"}", hs.userID)
 	tests := []struct {
 		description, req       string
 		wantCode, wantTokenLen int
@@ -183,7 +188,7 @@ func (hs *HandlerTestSuite) TestLoginHandler() {
 		{"BadRequest", `invalid request`, http.StatusBadRequest, 1, ""},
 		{"NonExistentUser", `{"username": "nonexistent", "password": "password"}`, http.StatusUnauthorized, 1, ""},
 		{"ExistingUserWithInvalidPassword", `{"username": "user", "password": "anInvalid"}`, http.StatusUnauthorized, 1, ""},
-		{"ExistingUserWithValidPassword", `{"username": "user", "password": "password"}`, http.StatusOK, 3, fmt.Sprintf("{\"iss\":\"auth\",\"sub\":\"%s\"}", hs.userID)},
+		{"ExistingUserWithValidPassword", `{"username": "user", "password": "password"}`, http.StatusOK, 3, validClaims},
 	}
 
 	for _, tt := range tests {
@@ -305,6 +310,95 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 
 }
 
+func (hs *HandlerTestSuite) TestEditProfileHandler() {
+	// register new user to avoid conflicts with user in the suite
+	req := registerUserRequest{"tempUser", "password", "temp@mail.com"}
+	id, _ := hs.svc.RegisterNewUser(req)
+	sid := string(id)
+
+	nilErr := errors.New("")
+	longBio := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut " +
+		"labore et dolore magna aliqua. Ut enim ad minim h"
+
+	S422 := http.StatusUnprocessableEntity
+
+	tests := []struct {
+		req                   string
+		id                    string
+		withCtx, reset        bool
+		wantCode              int
+		wantErr               error
+		wantUsername, wantBio string
+	}{
+		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{req: `{}`, wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
+		{req: `{}`, id: "invalid", wantCode: http.StatusUnauthorized, withCtx: true, wantErr: ErrInvalidID},
+		{req: `{}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr},
+		{req: `{"username": ""}`, id: sid, wantCode: S422, withCtx: true, wantErr: ErrInvalidUsername},
+		{req: fmt.Sprintf(`{"username": "%s"}`, req.Username), id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr},
+		{req: fmt.Sprintf(`{"username": "%s"}`, hs.req.Username), id: sid, wantCode: http.StatusConflict, withCtx: true, wantErr: ErrExistingUsername},
+		{req: `{"username": "newName"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr, wantUsername: "newName", reset: true},
+		{req: `{"bio": ""}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr},
+		{req: fmt.Sprintf(`{"bio": "%s"}`, longBio), id: sid, wantCode: S422, withCtx: true, wantErr: ErrBioTooLong},
+		{req: `{"bio": "Bios"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr, wantBio: "Bios"},
+		{req: `{"username": "newU", "bio": "Be nice"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr, wantBio: "Be nice", wantUsername: "newU"},
+	}
+
+	for _, tt := range tests {
+		r, _ := http.NewRequest(http.MethodPatch, "/v1/users", strings.NewReader(tt.req))
+
+		u := req.Username
+		if len(tt.wantUsername) > 0 {
+			u = tt.wantUsername
+		}
+
+		r2, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/v1/users/%s", u), nil)
+
+		if tt.withCtx {
+			r = r.WithContext(context.WithValue(r.Context(), idKey, tt.id))
+		}
+
+		router := httprouter.New()
+		router.Handler(http.MethodPatch, "/v1/users", EditProfileHandler(hs.svc))
+		router.Handler(http.MethodGet, "/v1/users/:username", GetProfileHandler(hs.svc))
+
+		w := httptest.NewRecorder()
+		w2 := httptest.NewRecorder()
+
+		router.ServeHTTP(w, r)
+		router.ServeHTTP(w2, r2)
+
+		var res struct {
+			Err string `json:"error"`
+		}
+
+		var res2 struct {
+			Profile Profile `json:"profile,omitempty"`
+		}
+
+		_ = json.NewDecoder(w.Body).Decode(&res)
+		_ = json.NewDecoder(w2.Body).Decode(&res2)
+
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
+		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
+		assert.Equal(hs.T(), tt.wantBio, res2.Profile.Bio)
+
+		if len(tt.wantUsername) > 0 {
+			assert.Equal(hs.T(), tt.wantUsername, res2.Profile.Username)
+		} else {
+			assert.Equal(hs.T(), req.Username, res2.Profile.Username)
+		}
+
+		//reset the username and bio
+		if tt.reset {
+			body := strings.NewReader(fmt.Sprintf(`{"username": "%s", "bio": ""}`, req.Username))
+			r3, _ := http.NewRequest(http.MethodPatch, "/v1/users", body)
+			r3 = r3.WithContext(context.WithValue(r3.Context(), idKey, tt.id))
+			router.ServeHTTP(w, r3)
+		}
+	}
+}
+
 func TestRequireAuthMiddleware(t *testing.T) {
 	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"
 	validToken, _ := getJWTToken("randomid")
@@ -355,9 +449,10 @@ func (hs *HandlerTestSuite) TestLastSeenMiddleware() {
 			called = true
 		}
 	}
+
 	l := LastSeenMiddleware(http.HandlerFunc(f), hs.svc)
 	r, _ := http.NewRequest("", "/doesnt-matter", nil)
-	pr, _ := http.NewRequest(http.MethodGet, "/v1/users/user", nil)
+	pr, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/v1/users/%s", hs.req.Username), nil)
 
 	tests := []struct {
 		id                          string

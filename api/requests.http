@@ -44,3 +44,14 @@ Authorization: Bearer <token.goes.here>
 Accept: application/json
 
 ###
+
+PATCH http://localhost:8090/v1/users
+Authorization: Bearer <token.goes.here>
+Content-Type: application/json
+
+{
+  "username": "user3",
+  "bio": "Bios"
+}
+
+###

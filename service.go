@@ -203,6 +203,7 @@ func (svc *service) GetProfile(username string) (Profile, error) {
 		ID:       user.ID,
 		Username: username,
 		Avatar:   avatar(user.email),
+		Bio:      user.bio,
 		Joined:   user.createdAt,
 		LastSeen: user.lastSeen,
 		Posts:    buildPostResponses(posts, user),
@@ -210,12 +211,12 @@ func (svc *service) GetProfile(username string) (Profile, error) {
 }
 
 func (svc *service) EditProfile(id ID, req editProfileRequest) error {
-	if req.Username == nil && req.Bio == nil {
-		return nil
-	}
-
 	if !IsValidID(string(id)) {
 		return ErrInvalidID
+	}
+
+	if req.Username == nil && req.Bio == nil {
+		return nil
 	}
 
 	user, err := svc.users.FindByID(id)
@@ -223,7 +224,7 @@ func (svc *service) EditProfile(id ID, req editProfileRequest) error {
 		return ErrNotFound
 	}
 
-	if req.Username != nil {
+	if req.Username != nil && *req.Username != user.username {
 		if err := svc.updateUsername(req.Username, user); err != nil {
 			return err
 		}

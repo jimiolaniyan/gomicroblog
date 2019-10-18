@@ -188,8 +188,11 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 			So(err, ShouldBeNil)
 
 			Convey("Then his profile shows the updated information", func() {
-				So(existingUser.username, ShouldEqual, newU)
-				So(existingUser.bio, ShouldEqual, bio)
+				profile, err := bs.svc.GetProfile(existingUser.username)
+
+				So(err, ShouldBeNil)
+				So(profile.Username, ShouldEqual, newU)
+				So(profile.Bio, ShouldEqual, bio)
 			})
 		})
 	})

@@ -235,11 +235,12 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 		wantBio string
 		wantUN  string
 	}{
-		{wantErr: nil, wantUN: origUN, wantBio: bio},
+		{wantErr: ErrInvalidID},
 		{req: emptyUsernameReq, wantErr: ErrInvalidID},
 		{id: nextID(), req: emptyUsernameReq, wantErr: ErrNotFound},
 		{id: tempUser.ID, req: emptyUsernameReq, wantErr: ErrInvalidUsername},
 		{id: tempUser.ID, req: editProfileRequest{Username: &ts.req.Username}, wantErr: ErrExistingUsername},
+		{id: tempUser.ID, req: editProfileRequest{Username: &origUN}, wantErr: nil, wantUN: origUN},
 		{id: tempUser.ID, req: editProfileRequest{Username: &u}, wantErr: nil, wantUN: u, wantBio: bio},
 		{id: tempUser.ID, req: editProfileRequest{Bio: &longBio}, wantErr: ErrBioTooLong, wantBio: bio, wantUN: origUN},
 		{id: tempUser.ID, req: editProfileRequest{Bio: new(string)}, wantErr: nil, wantBio: "", wantUN: origUN},

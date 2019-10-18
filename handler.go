@@ -119,6 +119,29 @@ func GetProfileHandler(svc Service) http.Handler {
 	})
 }
 
+func EditProfileHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		request, err := decodeEditProfileRequest(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		id, ok := getUserIDFromContext(r.Context())
+		if !ok {
+			encodeError(ErrEmptyContext, w)
+			return
+		}
+
+		err = svc.EditProfile(ID(id), request.(editProfileRequest))
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+	})
+}
+
 func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, ok := getUserIDFromContext(r.Context())
@@ -183,7 +206,7 @@ func encodeError(err error, w http.ResponseWriter) {
 	switch err {
 	case ErrExistingUsername, ErrExistingEmail:
 		w.WriteHeader(http.StatusConflict)
-	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername:
+	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername, ErrBioTooLong:
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	case ErrInvalidCredentials, ErrInvalidID:
 		w.WriteHeader(http.StatusUnauthorized)
@@ -220,6 +243,14 @@ func decodeCreatePostRequest(body io.ReadCloser) (interface{}, error) {
 	req := createPostRequest{}
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
 		return createPostRequest{}, err
+	}
+	return req, nil
+}
+
+func decodeEditProfileRequest(body io.ReadCloser) (interface{}, error) {
+	req := editProfileRequest{}
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return editProfileRequest{}, err
 	}
 	return req, nil
 }
