@@ -30,6 +30,8 @@ type user struct {
 	createdAt time.Time
 	lastSeen  time.Time
 	bio       string
+	Friends   []*user
+	Followers []*user
 }
 
 var (
@@ -43,6 +45,22 @@ var (
 	ErrInvalidCredentials = errors.New("invalid username or password")
 	ErrBioTooLong         = errors.New("bio cannot be more than 140 characters")
 )
+
+func (u1 *user) IsFollowing(u2 *user) bool {
+	for _, friend := range u1.Friends {
+		if friend.ID == u2.ID {
+			return true
+		}
+	}
+	return false
+}
+
+func (u1 *user) Follow(u2 *user) {
+	if !u1.IsFollowing(u2) {
+		u1.Friends = append(u1.Friends, u2)
+		u2.Followers = append(u2.Followers, u1)
+	}
+}
 
 func NewUser(username, email string) (*user, error) {
 	if err := validateArgs(username, email); err != nil {

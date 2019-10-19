@@ -42,29 +42,10 @@ func (ts *ServiceTestSuite) TestService_RegisterNewUser() {
 		wantLastSeen               bool
 		wantErr                    error
 	}{
-		{
-			description: "ExistingUsername",
-			req:         &registerUserRequest{"username", "password1", "b@c"},
-			wantErr:     ErrExistingUsername,
-		},
-		{
-			description: "ExistingEmail",
-			req:         &registerUserRequest{"username2", "password1", "a@b"},
-			wantErr:     ErrExistingEmail,
-		},
-		{
-			description: "InvalidPassword",
-			req:         &registerUserRequest{"username2", "passwod", "b@c"},
-			wantErr:     ErrInvalidPassword,
-		},
-		{
-			description:   "ValidCredentials",
-			req:           &registerUserRequest{"username2", "password", "b@c.com"},
-			wantValidID:   true,
-			wantCreatedAt: true,
-			wantLastSeen:  true,
-			wantErr:       nil,
-		},
+		{description: "ExistingUsername", req: &registerUserRequest{"username", "password1", "b@c"}, wantErr: ErrExistingUsername},
+		{description: "ExistingEmail", req: &registerUserRequest{"username2", "password1", "a@b"}, wantErr: ErrExistingEmail},
+		{description: "InvalidPassword", req: &registerUserRequest{"username2", "passwod", "b@c"}, wantErr: ErrInvalidPassword},
+		{description: "ValidCredentials", req: &registerUserRequest{"username2", "password", "b@c.com"}, wantValidID: true, wantCreatedAt: true, wantLastSeen: true, wantErr: nil},
 	}
 
 	for _, tt := range tests {
@@ -265,11 +246,75 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 	_ = ts.svc.users.Delete(tempUser.ID)
 }
 
+func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
+	u1 := duplicateUser(ts.svc, *ts.user, "user1")
+	u2 := duplicateUser(ts.svc, *ts.user, "user2")
+
+	tests := []struct {
+		id       ID
+		username string
+		wantErr  error
+		wantF    bool
+		wantLen  int
+	}{
+		{id: "invalid", wantErr: ErrInvalidID},
+		{id: nextID(), wantErr: ErrInvalidUsername},
+		{id: nextID(), username: "nonexistent", wantErr: ErrNotFound},
+		{id: u1.ID, username: u2.username, wantErr: nil, wantF: true, wantLen: 1},
+		{id: u1.ID, username: u2.username, wantErr: nil, wantF: true, wantLen: 1},
+	}
+
+	for _, tt := range tests {
+		err := ts.svc.CreateRelationshipFor(tt.id, tt.username)
+
+		assert.Equal(ts.T(), tt.wantErr, err)
+		assert.Equal(ts.T(), tt.wantF, u1.IsFollowing(u2))
+		assert.Equal(ts.T(), tt.wantLen, len(u1.Friends))
+		assert.Equal(ts.T(), tt.wantLen, len(u2.Followers))
+	}
+
+	// clean up
+	_ = ts.svc.users.Delete(u1.ID)
+	_ = ts.svc.users.Delete(u2.ID)
+}
+
+func (ts *ServiceTestSuite) TestRelationships() {
+	u1 := duplicateUser(ts.svc, *ts.user, "u1")
+	u2 := duplicateUser(ts.svc, *ts.user, "u2")
+	u1.Follow(u2)
+
+	tests := []struct {
+		username           string
+		wantErr            error
+		wantFriendsCount   int
+		wantFollowersCount int
+	}{
+		{wantErr: ErrInvalidUsername},
+		{username: "nonexistent", wantErr: ErrNotFound},
+		{username: ts.req.Username, wantErr: nil},
+		{username: u1.username, wantErr: nil, wantFriendsCount: 1},
+		{username: u2.username, wantErr: nil, wantFollowersCount: 1},
+	}
+
+	for _, tt := range tests {
+		friends, err := ts.svc.GetUserFriends(tt.username)
+		followers, err := ts.svc.GetUserFollowers(tt.username)
+
+		assert.Equal(ts.T(), tt.wantErr, err)
+		assert.Equal(ts.T(), tt.wantFriendsCount, len(friends))
+		assert.Equal(ts.T(), tt.wantFollowersCount, len(followers))
+	}
+
+	// clean up
+	_ = ts.svc.users.Delete(u1.ID)
+	_ = ts.svc.users.Delete(u2.ID)
+}
+
 func (ts *ServiceTestSuite) TestNewService() {
 	users := NewUserRepository()
 	posts := NewPostRepository()
-	svc := NewService(users, posts)
 
+	svc := NewService(users, posts)
 	s := svc.(*service)
 
 	assert.Equal(ts.T(), users, s.users)

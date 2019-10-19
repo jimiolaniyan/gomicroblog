@@ -193,13 +193,77 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 				So(err, ShouldBeNil)
 				So(profile.Username, ShouldEqual, newU)
 				So(profile.Bio, ShouldEqual, bio)
+
+				Reset(func() {
+					_ = bs.svc.users.Delete(existingUser.ID)
+				})
 			})
 		})
 	})
 }
 
-func TestBddSuite(t *testing.T) {
-	suite.Run(t, new(BddTestSuite))
+func (bs *BddTestSuite) TestFollowingBetweenUsers() {
+	Convey("Given two users U1 and U2 with no relationship", bs.T(), func() {
+		u1 := duplicateUser(bs.svc, *bs.user, "U1")
+		u2 := duplicateUser(bs.svc, *bs.user, "U2")
+
+		Convey("When U1 follows U2", func() {
+
+			err := bs.svc.CreateRelationshipFor(u1.ID, u2.username)
+			So(err, ShouldBeNil)
+
+			Convey("Then U1 is following U2", func() {
+				So(u1.IsFollowing(u2), ShouldBeTrue)
+
+				Convey("And U2 is in U1's friends list", func() {
+					friends, err := bs.svc.GetUserFriends(u1.username)
+
+					So(err, ShouldBeNil)
+
+					userInfo := getUserInfoFromList(friends, u2.ID)
+					expectedUserInfo := createInfoFromUser(u2)
+
+					So(userInfo, ShouldResemble, expectedUserInfo)
+
+					Convey("And U1 is in U2's followers list", func() {
+						followers, err := bs.svc.GetUserFollowers(u2.username)
+
+						So(err, ShouldBeNil)
+
+						userInfo := getUserInfoFromList(followers, u1.ID)
+						expectedUserInfo := createInfoFromUser(u1)
+
+						So(userInfo, ShouldResemble, expectedUserInfo)
+
+						Reset(func() {
+							_ = bs.svc.users.Delete(u2.ID)
+							_ = bs.svc.users.Delete(u1.ID)
+						})
+					})
+				})
+			})
+		})
+	})
+}
+
+func createInfoFromUser(u2 *user) UserInfo {
+	return UserInfo{
+		ID:       u2.ID,
+		Username: u2.username,
+		Avatar:   avatar(u2.email),
+		Bio:      u2.bio,
+		Joined:   u2.createdAt,
+	}
+}
+
+func getUserInfoFromList(infos []UserInfo, id ID) UserInfo {
+	var t UserInfo
+	for _, userInfo := range infos {
+		if userInfo.ID == id {
+			t = userInfo
+		}
+	}
+	return t
 }
 
 func createPosts(id ID, svc service) (ids []PostID, ok bool) {
@@ -210,4 +274,8 @@ func createPosts(id ID, svc service) (ids []PostID, ok bool) {
 	ids = append(ids, id1, id2, id3)
 	ok = true
 	return
+}
+
+func TestBddSuite(t *testing.T) {
+	suite.Run(t, new(BddTestSuite))
 }

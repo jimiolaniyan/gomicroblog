@@ -18,6 +18,7 @@ type Service interface {
 	GetProfile(username string) (Profile, error)
 	UpdateLastSeen(id ID) error
 	EditProfile(id ID, req editProfileRequest) error
+	CreateRelationshipFor(id ID, username string) error
 }
 
 type service struct {
@@ -86,6 +87,14 @@ type profileResponse struct {
 	Profile *Profile `json:"profile,omitempty"`
 	URL     string   `json:"url"`
 	Err     error    `json:"err,omitempty"`
+}
+
+type UserInfo struct {
+	ID       ID        `json:"id"`
+	Username string    `json:"username"`
+	Avatar   string    `json:"avatar_url"`
+	Bio      string    `json:"bio"`
+	Joined   time.Time `json:"joined"`
 }
 
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
@@ -276,6 +285,72 @@ func (svc *service) UpdateLastSeen(id ID) error {
 		return fmt.Errorf("error updating last seen: %s", err.Error())
 	}
 	return nil
+}
+
+func (svc *service) CreateRelationshipFor(id ID, username string) error {
+	if !IsValidID(string(id)) {
+		return ErrInvalidID
+	}
+
+	if username == "" {
+		return ErrInvalidUsername
+	}
+
+	u1, err := svc.users.FindByID(id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	u2, err := svc.users.FindByName(username)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	u1.Follow(u2)
+	return nil
+}
+
+func (svc *service) GetUserFriends(username string) ([]UserInfo, error) {
+	user, err := svc.findUser(username)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildUserInfosFromUsers(user.Friends), nil
+}
+
+func (svc *service) GetUserFollowers(username string) ([]UserInfo, error) {
+	user, err := svc.findUser(username)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildUserInfosFromUsers(user.Followers), nil
+}
+
+func buildUserInfosFromUsers(users []*user) []UserInfo {
+	var infos []UserInfo
+	for _, user := range users {
+		infos = append(infos, UserInfo{
+			ID:       user.ID,
+			Username: user.username,
+			Avatar:   avatar(user.email),
+			Bio:      user.bio,
+			Joined:   user.createdAt,
+		})
+	}
+	return infos
+}
+
+func (svc *service) findUser(username string) (*user, error) {
+	if username == "" {
+		return nil, ErrInvalidUsername
+	}
+	user, err := svc.users.FindByName(username)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	return user, nil
 }
 
 func buildPostResponses(posts []*post, user *user) []postResponse {
