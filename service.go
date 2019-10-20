@@ -323,6 +323,21 @@ func (svc *service) GetUserFollowers(username string) ([]UserInfo, error) {
 	return buildUserInfosFromUsers(user.Followers), nil
 }
 
+func (svc *service) GetTimeline(id ID) ([]postResponse, error) {
+	if !IsValidID(string(id)) {
+		return nil, ErrInvalidID
+	}
+
+	user, err := svc.users.FindByID(id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	posts, _ := svc.posts.FindLatestPostsForUserAndFriends(user)
+
+	return buildPostResponses(posts, user), nil
+}
+
 // TODO refactor this to use get U1 and U2 separately
 func (svc *service) getU1U2(id ID, username string) (u1 *user, u2 *user, err error) {
 	if !IsValidID(string(id)) {

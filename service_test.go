@@ -348,6 +348,52 @@ func (ts *ServiceTestSuite) TestRelationships() {
 	_ = ts.svc.users.Delete(u2.ID)
 }
 
+func (ts *ServiceTestSuite) TestGetTimeline() {
+	u1 := duplicateUser(ts.svc, *ts.user, "a1")
+	u2 := duplicateUser(ts.svc, *ts.user, "a2")
+	u3 := duplicateUser(ts.svc, *ts.user, "a3")
+	u4 := duplicateUser(ts.svc, *ts.user, "a4")
+	u5 := duplicateUser(ts.svc, *ts.user, "a5")
+
+	u1.Follow(u2)
+	u1.Follow(u3)
+	u1.Follow(u4)
+	u5.Follow(u4)
+
+	_, _ = ts.svc.CreatePost(u2.ID, "p2")
+	_, _ = ts.svc.CreatePost(u1.ID, "p3")
+	_, _ = ts.svc.CreatePost(u2.ID, "p4")
+	_, _ = ts.svc.CreatePost(u4.ID, "p5")
+
+	tests := []struct {
+		id          ID
+		wantErr     error
+		wantPostLen int
+	}{
+		{id: "invalid", wantErr: ErrInvalidID},
+		{id: nextID(), wantErr: ErrNotFound},
+		{id: u3.ID},
+		{id: u2.ID, wantPostLen: 2},
+		{id: u4.ID, wantPostLen: 1},
+		{id: u5.ID, wantPostLen: 1},
+		{id: u1.ID, wantPostLen: 4},
+	}
+
+	for _, tt := range tests {
+		tl, err := ts.svc.GetTimeline(tt.id)
+
+		assert.Equal(ts.T(), tt.wantErr, err)
+		assert.Equal(ts.T(), tt.wantPostLen, len(tl))
+	}
+
+	// clean up
+	_ = ts.svc.users.Delete(u1.ID)
+	_ = ts.svc.users.Delete(u2.ID)
+	_ = ts.svc.users.Delete(u3.ID)
+	_ = ts.svc.users.Delete(u4.ID)
+	_ = ts.svc.users.Delete(u5.ID)
+}
+
 func (ts *ServiceTestSuite) TestNewService() {
 	users := NewUserRepository()
 	posts := NewPostRepository()

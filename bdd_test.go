@@ -279,14 +279,60 @@ func (bs *BddTestSuite) TestRelationships_Remove() {
 							So(userInfo, ShouldResemble, UserInfo{})
 
 							Reset(func() {
-								_ = bs.svc.users.Delete(u2.ID)
 								_ = bs.svc.users.Delete(u1.ID)
+								_ = bs.svc.users.Delete(u2.ID)
 							})
 						})
 					})
 				})
 			})
 		})
+	})
+}
+
+func (bs *BddTestSuite) TestTimelines() {
+	Convey("Given user U1 following U2 and U3 ", bs.T(), func() {
+		u1 := duplicateUser(bs.svc, *bs.user, "uu1")
+		u2 := duplicateUser(bs.svc, *bs.user, "uu2")
+		u3 := duplicateUser(bs.svc, *bs.user, "uu3")
+
+		u1.Follow(u2)
+		u1.Follow(u3)
+		Convey("With U1, U2 and U3 having the following posts", func() {
+			posts := []string{"p1", "p2", "p3", "p4", "p5", "p6"}
+			p21ID, _ := bs.svc.CreatePost(u2.ID, posts[1])
+			p31ID, _ := bs.svc.CreatePost(u3.ID, posts[0])
+			p22ID, _ := bs.svc.CreatePost(u2.ID, posts[5])
+			p11ID, _ := bs.svc.CreatePost(u1.ID, posts[2])
+			p32ID, _ := bs.svc.CreatePost(u3.ID, posts[3])
+			p12ID, _ := bs.svc.CreatePost(u2.ID, posts[4])
+
+			Convey("When requests his timeline", func() {
+				tl, err := bs.svc.GetTimeline(u1.ID)
+				So(err, ShouldBeNil)
+
+				Convey("Then his timeline is as follows", func() {
+					ar := authorResponse{u1.ID, u1.username, avatar(u1.email)}
+					expectedTL := []postResponse{
+						{p12ID, posts[4], tl[0].Timestamp, ar},
+						{p32ID, posts[3], tl[1].Timestamp, ar},
+						{p11ID, posts[2], tl[2].Timestamp, ar},
+						{p22ID, posts[5], tl[3].Timestamp, ar},
+						{p31ID, posts[0], tl[4].Timestamp, ar},
+						{p21ID, posts[1], tl[5].Timestamp, ar},
+					}
+
+					So(tl, ShouldResemble, expectedTL)
+
+					Reset(func() {
+						_ = bs.svc.users.Delete(u1.ID)
+						_ = bs.svc.users.Delete(u2.ID)
+						_ = bs.svc.users.Delete(u3.ID)
+					})
+				})
+			})
+		})
+
 	})
 }
 

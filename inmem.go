@@ -67,7 +67,26 @@ func (repo *postRepository) FindByID(id PostID) (post, error) {
 }
 
 func (repo *postRepository) FindLatestPostsForUser(id ID) ([]*post, error) {
-	//fmt.Println(id)
+	posts := repo.FindUserPosts(id)
+
+	sortPostsByTimestamp(posts)
+
+	return posts, nil
+}
+
+func (repo *postRepository) FindLatestPostsForUserAndFriends(user *user) ([]*post, error) {
+	posts := repo.FindUserPosts(user.ID)
+
+	for _, user := range user.Friends {
+		ps := repo.FindUserPosts(user.ID)
+		posts = append(posts, ps...)
+	}
+
+	sortPostsByTimestamp(posts)
+	return posts, nil
+}
+
+func (repo *postRepository) FindUserPosts(id ID) []*post {
 	var posts []*post
 	for i, p := range repo.posts {
 		if p.Author.UserID == id {
@@ -75,12 +94,13 @@ func (repo *postRepository) FindLatestPostsForUser(id ID) ([]*post, error) {
 			posts = append(posts, &pp)
 		}
 	}
+	return posts
+}
 
+func sortPostsByTimestamp(posts []*post) {
 	sort.Slice(posts, func(i, j int) bool {
 		return posts[i].timestamp.After(posts[j].timestamp)
 	})
-
-	return posts, nil
 }
 
 func NewPostRepository() PostRepository {
