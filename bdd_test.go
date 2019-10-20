@@ -133,38 +133,50 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 	})
 }
 
-func (bs *BddTestSuite) TestProfileWithPosts() {
-	Convey("Given a returning user U with posts", bs.T(), func() {
-		postIDs, ok := createPosts(bs.userID, bs.svc)
+func (bs *BddTestSuite) TestProfileWithPostsAndFriends() {
+	Convey("Given a returning user U1 with posts", bs.T(), func() {
+		u1 := duplicateUser(bs.svc, *bs.user, "fU1")
+
+		postIDs, ok := createPosts(u1.ID, bs.svc)
 		So(ok, ShouldBeTrue)
 
-		err := bs.svc.UpdateLastSeen(bs.userID)
+		err := bs.svc.UpdateLastSeen(u1.ID)
 		So(err, ShouldBeNil)
 
-		Convey("When his profile is requested", func() {
-			profile, err := bs.svc.GetProfile(bs.req.Username)
-
-			So(err, ShouldBeNil)
-			So(profile, ShouldNotBeNil)
-
-			Convey("Then his profile contains his posts in reverse chronological order", func() {
-
-				av := avatar("user@app.com")
-				expected := Profile{
-					Posts: []postResponse{
-						{ID: postIDs[2], Author: authorResponse{Username: "U", UserID: bs.userID, Avatar: av}, Body: "C", Timestamp: profile.Posts[0].Timestamp},
-						{ID: postIDs[1], Author: authorResponse{Username: "U", UserID: bs.userID, Avatar: av}, Body: "B", Timestamp: profile.Posts[1].Timestamp},
-						{ID: postIDs[0], Author: authorResponse{Username: "U", UserID: bs.userID, Avatar: av}, Body: "A", Timestamp: profile.Posts[2].Timestamp},
-					},
-				}
+		Convey("With U1 and U2 following each other", func() {
+			u2 := duplicateUser(bs.svc, *bs.user, "fU2")
+			u1.Follow(u2)
+			u2.Follow(u1)
+			Convey("When his profile is requested", func() {
+				profile, err := bs.svc.GetProfile(u1.username)
 
 				So(err, ShouldBeNil)
-				So(expected.Posts, ShouldResemble, profile.Posts)
+				So(profile, ShouldNotBeNil)
 
-				Convey("Add his last seen is updated.", func() {
-					user, _ := bs.svc.users.FindByID(bs.userID)
-					So(profile.LastSeen, ShouldEqual, user.lastSeen)
-					So(profile.LastSeen.After(profile.Joined), ShouldBeTrue)
+				Convey("Then his profile contains his posts in reverse chronological order", func() {
+					ar := authorResponse{Username: u1.username, UserID: u1.ID, Avatar: avatar("user@app.com")}
+					expected := Profile{
+						Relationships: Relationships{Followers: 1, Friends: 1},
+						Posts: []postResponse{
+							{ID: postIDs[2], Author: ar, Body: "C", Timestamp: profile.Posts[0].Timestamp},
+							{ID: postIDs[1], Author: ar, Body: "B", Timestamp: profile.Posts[1].Timestamp},
+							{ID: postIDs[0], Author: ar, Body: "A", Timestamp: profile.Posts[2].Timestamp},
+						},
+					}
+
+					So(err, ShouldBeNil)
+					So(expected.Posts, ShouldResemble, profile.Posts)
+
+					Convey("Add his last seen is updated.", func() {
+						user, _ := bs.svc.users.FindByID(u1.ID)
+						So(profile.LastSeen, ShouldEqual, user.lastSeen)
+						So(profile.LastSeen.After(profile.Joined), ShouldBeTrue)
+
+						Reset(func() {
+							_ = bs.svc.users.Delete(u1.ID)
+							_ = bs.svc.users.Delete(u2.ID)
+						})
+					})
 				})
 			})
 		})

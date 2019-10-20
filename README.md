@@ -20,7 +20,7 @@ See `api/requests.http` for full examples.
 ### Register new user
 ```
 curl -X POST \
-  http://localhost:8090/v1/users/new \
+  http://localhost:8090/v1/users \
   -H 'Content-Type: application/json' \
   -d '{
 	"username": "jimi",
@@ -31,7 +31,7 @@ curl -X POST \
 ### Login existing user
 ```
 curl -X POST \
-  http://localhost:8090/v1/auth/login \
+  http://localhost:8090/v1/sessions \
   -H 'Content-Type: application/json' \
   -d '{ 
         "username": "jimi",

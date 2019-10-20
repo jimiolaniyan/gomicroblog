@@ -148,11 +148,10 @@ func (ts *ServiceTestSuite) TestService_GetProfile() {
 		wantErr            error
 		wantUN, wantAvatar string
 		wantID             ID
-		wantJ, wantLS      bool
 	}{
 		{username: "", wantErr: ErrInvalidUsername, wantUN: ""},
 		{username: "void", wantErr: ErrNotFound, wantUN: ""},
-		{username: u, wantErr: nil, wantUN: u, wantAvatar: av, wantJ: true, wantLS: true, wantID: ts.user.ID},
+		{username: u, wantErr: nil, wantUN: u, wantAvatar: av, wantID: ts.user.ID},
 	}
 
 	for _, tt := range tests {

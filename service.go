@@ -59,8 +59,8 @@ type editProfileRequest struct {
 }
 
 type Relationships struct {
-	Followers []user `json:"followers"`
-	Following []user `json:"following"`
+	Followers int `json:"followers"`
+	Friends   int `json:"following"`
 }
 
 type Profile struct {
@@ -224,7 +224,11 @@ func (svc *service) GetProfile(username string) (Profile, error) {
 		Bio:      user.bio,
 		Joined:   user.createdAt,
 		LastSeen: user.lastSeen,
-		Posts:    buildPostResponses(posts, user),
+		Relationships: Relationships{
+			Followers: len(user.Followers),
+			Friends:   len(user.Friends),
+		},
+		Posts: buildPostResponses(posts, user),
 	}, nil
 }
 
