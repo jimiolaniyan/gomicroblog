@@ -251,24 +251,25 @@ func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
 	u2 := duplicateUser(ts.svc, *ts.user, "user2")
 
 	tests := []struct {
-		id       ID
-		username string
-		wantErr  error
-		wantF    bool
-		wantLen  int
+		id         ID
+		username   string
+		wantErr    error
+		wantFollow bool
+		wantLen    int
 	}{
 		{id: "invalid", wantErr: ErrInvalidID},
 		{id: nextID(), wantErr: ErrInvalidUsername},
 		{id: nextID(), username: "nonexistent", wantErr: ErrNotFound},
-		{id: u1.ID, username: u2.username, wantErr: nil, wantF: true, wantLen: 1},
-		{id: u1.ID, username: u2.username, wantErr: nil, wantF: true, wantLen: 1},
+		{id: u1.ID, username: u1.username, wantErr: ErrCantFollowSelf},
+		{id: u1.ID, username: u2.username, wantErr: nil, wantFollow: true, wantLen: 1},
+		{id: u1.ID, username: u2.username, wantErr: nil, wantFollow: true, wantLen: 1}, // ensure follow happens once
 	}
 
 	for _, tt := range tests {
 		err := ts.svc.CreateRelationshipFor(tt.id, tt.username)
 
 		assert.Equal(ts.T(), tt.wantErr, err)
-		assert.Equal(ts.T(), tt.wantF, u1.IsFollowing(u2))
+		assert.Equal(ts.T(), tt.wantFollow, u1.IsFollowing(u2))
 		assert.Equal(ts.T(), tt.wantLen, len(u1.Friends))
 		assert.Equal(ts.T(), tt.wantLen, len(u2.Followers))
 	}

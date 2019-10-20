@@ -244,6 +244,7 @@ func (svc *service) EditProfile(id ID, req editProfileRequest) error {
 			return err
 		}
 	}
+	// TODO May need to call svc.users.Store with a real DB
 
 	return nil
 }
@@ -301,12 +302,17 @@ func (svc *service) CreateRelationshipFor(id ID, username string) error {
 		return ErrNotFound
 	}
 
+	if u1.username == username {
+		return ErrCantFollowSelf
+	}
+
 	u2, err := svc.users.FindByName(username)
 	if err != nil {
 		return ErrNotFound
 	}
 
 	u1.Follow(u2)
+	// TODO May need to call svc.users.Store with a real DB
 	return nil
 }
 

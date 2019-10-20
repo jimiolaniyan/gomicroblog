@@ -44,6 +44,7 @@ var (
 	ErrExistingEmail      = errors.New("email in use")
 	ErrInvalidCredentials = errors.New("invalid username or password")
 	ErrBioTooLong         = errors.New("bio cannot be more than 140 characters")
+	ErrCantFollowSelf     = errors.New("can't follow yourself")
 )
 
 func (u1 *user) IsFollowing(u2 *user) bool {
