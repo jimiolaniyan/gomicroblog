@@ -47,6 +47,7 @@ var (
 	ErrCantFollowSelf     = errors.New("can't follow yourself")
 	ErrCantUnFollowSelf   = errors.New("can't unfollow yourself")
 	ErrAlreadyFollowing   = errors.New("already following user")
+	ErrNotFollowing       = errors.New("not following user")
 )
 
 func (u1 *user) IsFollowing(u2 *user) bool {
@@ -63,10 +64,8 @@ func (u1 *user) Follow(u2 *user) {
 }
 
 func (u1 *user) Unfollow(u2 *user) {
-	if u1.IsFollowing(u2) {
-		delete(u1.Friends, u2.ID)
-		delete(u2.Followers, u1.ID)
-	}
+	delete(u1.Friends, u2.ID)
+	delete(u2.Followers, u1.ID)
 }
 
 func NewUser(username, email string) (*user, error) {

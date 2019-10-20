@@ -305,8 +305,11 @@ func (svc *service) RemoveRelationshipFor(id ID, username string) error {
 		return ErrCantUnFollowSelf
 	}
 
-	u1.Unfollow(u2)
+	if !u1.IsFollowing(u2) {
+		return ErrNotFollowing
+	}
 
+	u1.Unfollow(u2)
 	return nil
 }
 

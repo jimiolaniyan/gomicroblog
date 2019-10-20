@@ -145,25 +145,52 @@ func CreateRelationshipHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		username := getNameFromRequestParams(r, "username")
-		if username == "" {
-			w.WriteHeader(http.StatusBadRequest)
+		username, id, ok := getRelationshipRequestParams(r, w)
+		if !ok {
 			return
 		}
 
-		id, ok := getUserIDFromContext(r.Context())
-		if !ok {
-			encodeError(ErrEmptyContext, w)
-			return
-		}
-		err := svc.CreateRelationshipFor(ID(id), username)
-		if err != nil {
+		if err := svc.CreateRelationshipFor(ID(id), username); err != nil {
 			encodeError(err, w)
 			return
 		}
+
 		w.WriteHeader(http.StatusNoContent)
 		return
 	})
+}
+
+func RemoveRelationshipHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		username, id, ok := getRelationshipRequestParams(r, w)
+		if !ok {
+			return
+		}
+
+		if err := svc.RemoveRelationshipFor(ID(id), username); err != nil {
+			encodeError(err, w)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+		return
+	})
+}
+
+func getRelationshipRequestParams(r *http.Request, w http.ResponseWriter) (string, string, bool) {
+	username := getNameFromRequestParams(r, "username")
+	if username == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return "", "", false
+	}
+
+	id, ok := getUserIDFromContext(r.Context())
+	if !ok {
+		encodeError(ErrEmptyContext, w)
+		return "", "", false
+	}
+
+	return username, id, true
 }
 
 func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
@@ -236,11 +263,11 @@ func encodeError(err error, w http.ResponseWriter) {
 	switch err {
 	case ErrInvalidCredentials, ErrInvalidID:
 		w.WriteHeader(http.StatusUnauthorized)
-	case ErrCantFollowSelf:
+	case ErrCantFollowSelf, ErrCantUnFollowSelf:
 		w.WriteHeader(http.StatusForbidden)
 	case ErrNotFound:
 		w.WriteHeader(http.StatusNotFound)
-	case ErrExistingUsername, ErrExistingEmail, ErrAlreadyFollowing:
+	case ErrExistingUsername, ErrExistingEmail, ErrAlreadyFollowing, ErrNotFollowing:
 		w.WriteHeader(http.StatusConflict)
 	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername, ErrBioTooLong:
 		w.WriteHeader(http.StatusUnprocessableEntity)

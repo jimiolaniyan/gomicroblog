@@ -62,9 +62,11 @@ func TestDecodeRequest(t *testing.T) {
 	}
 }
 
-func TestHandlerResponses(t *testing.T) {
+var nilErr = errors.New("")
+
+func TestRegisterNewUserHandler(t *testing.T) {
 	svc := &service{users: NewUserRepository()}
-	url := "/v1/users/new"
+	url := "/v1/users"
 	registerHandler := RegisterUserHandler(svc)
 	registerReq := `
 		{
@@ -85,7 +87,7 @@ func TestHandlerResponses(t *testing.T) {
 			registerReq,
 			http.StatusCreated,
 			true,
-			errors.New(""),
+			nilErr,
 			"/v1/users",
 			false,
 		},
@@ -94,7 +96,7 @@ func TestHandlerResponses(t *testing.T) {
 			`invalid request`,
 			http.StatusBadRequest,
 			false,
-			errors.New(""),
+			nilErr,
 			"",
 			false,
 		},
@@ -193,12 +195,12 @@ func (hs *HandlerTestSuite) TestLoginHandler() {
 
 	for _, tt := range tests {
 		hs.Run(tt.description, func() {
-			req, err := http.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(tt.req))
+			req, err := http.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(tt.req))
 			assert.Nil(hs.T(), err)
 
 			w := httptest.NewRecorder()
 			mux := http.NewServeMux()
-			mux.Handle("/v1/auth/login", LoginHandler(hs.svc))
+			mux.Handle("/v1/sessions", LoginHandler(hs.svc))
 			mux.ServeHTTP(w, req)
 
 			var res struct {
@@ -229,12 +231,12 @@ func (hs *HandlerTestSuite) TestCreatePostHandler() {
 		wantLocation string
 		wantCtx      bool
 	}{
-		{`invalid request`, "", http.StatusBadRequest, errors.New(""), false, "", true},
+		{`invalid request`, "", http.StatusBadRequest, nilErr, false, "", true},
 		{`{}`, "", http.StatusInternalServerError, ErrEmptyContext, false, "", false},
 		{`{"body": ""}`, "", http.StatusUnauthorized, ErrInvalidID, false, "", true},
 		{`{"body": ""}`, "puoiwoerigp", http.StatusUnauthorized, ErrInvalidID, false, "", true},
 		{`{"body": ""}`, string(hs.userID), http.StatusUnprocessableEntity, ErrEmptyBody, false, "", true},
-		{`{"body": "i love my wife :)"}`, string(hs.userID), http.StatusCreated, errors.New(""), true, "/v1/posts/", true},
+		{`{"body": "i love my wife :)"}`, string(hs.userID), http.StatusCreated, nilErr, true, "/v1/posts/", true},
 	}
 
 	for _, tt := range tests {
@@ -270,7 +272,6 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 	u := hs.req.Username
 	host := "http://localhost:8080"
 	finalURL := fmt.Sprintf("%s/v1/users/%s", host, u)
-	nilErr := errors.New("")
 
 	tests := []struct {
 		username              string
@@ -316,7 +317,6 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 	id, _ := hs.svc.RegisterNewUser(req)
 	sid := string(id)
 
-	nilErr := errors.New("")
 	longBio := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut " +
 		"labore et dolore magna aliqua. Ut enim ad minim h"
 
@@ -401,37 +401,80 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 
 func (hs *HandlerTestSuite) TestCreateRelationshipHandler() {
 	uid := string(hs.userID)
-	nilErr := errors.New("")
 
 	u := "followUser"
-	otherReq := registerUserRequest{u, "password", "f@u.co"}
-	_, err := hs.svc.RegisterNewUser(otherReq)
+	_, err := hs.svc.RegisterNewUser(registerUserRequest{u, "password", "f@u.co"})
 	assert.Nil(hs.T(), err)
 
 	tests := []struct {
-		id, username string
-		withCtx      bool
-		wantCode     int
-		wantErr      error
+		username string
+		withCtx  bool
+		wantCode int
+		wantErr  error
 	}{
-		{id: uid, username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr},
-		{id: uid, username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
-		{id: uid, username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
-		{id: uid, username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantFollowSelf},
-		{id: uid, username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: nilErr},
-		{id: uid, username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrAlreadyFollowing},
+		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
+		{username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
+		{username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantFollowSelf},
+		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: nilErr},
+		{username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrAlreadyFollowing},
 	}
 
 	for _, tt := range tests {
 		u := fmt.Sprintf("/v1/users/%s/followers", tt.username)
-		r, _ := http.NewRequest(http.MethodPut, u, nil)
+		r, _ := http.NewRequest(http.MethodPost, u, nil)
 
 		if tt.withCtx {
-			r = setIDInRequestContext(r, tt.id)
+			r = setIDInRequestContext(r, uid)
 		}
 
 		router := httprouter.New()
-		router.Handler(http.MethodPut, "/v1/users/:username/followers", CreateRelationshipHandler(hs.svc))
+		router.Handler(http.MethodPost, "/v1/users/:username/followers", CreateRelationshipHandler(hs.svc))
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+
+		var res struct {
+			Err string `json:"error,omitempty"`
+		}
+
+		_ = json.NewDecoder(w.Body).Decode(&res)
+
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
+		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
+	}
+}
+
+func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
+	uid := string(hs.userID)
+
+	u := "unFollowUser"
+	_, _ = hs.svc.RegisterNewUser(registerUserRequest{u, "password", "u@u.co"})
+	_ = hs.svc.CreateRelationshipFor(ID(uid), u)
+
+	tests := []struct {
+		username string
+		withCtx  bool
+		wantCode int
+		wantErr  error
+	}{
+		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
+		{username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
+		{username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantUnFollowSelf},
+		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: nilErr},
+		{username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrNotFollowing},
+	}
+
+	for _, tt := range tests {
+		r, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("/v1/users/%s/followers", tt.username), nil)
+
+		if tt.withCtx {
+			r = setIDInRequestContext(r, uid)
+		}
+
+		router := httprouter.New()
+		router.Handler(http.MethodDelete, "/v1/users/:username/followers", RemoveRelationshipHandler(hs.svc))
 
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, r)

@@ -296,7 +296,7 @@ func (ts *ServiceTestSuite) TestRemoveRelationshipFor() {
 		{id: nextID(), username: "nonexistent", wantErr: ErrNotFound},
 		{id: u1.ID, username: u1.username, wantErr: ErrCantUnFollowSelf},
 		{id: u1.ID, username: u2.username, wantErr: nil},
-		{id: u1.ID, username: u2.username, wantErr: nil}, // ensure unfollow happens once
+		{id: u1.ID, username: u2.username, wantErr: ErrNotFollowing},
 	}
 
 	for _, tt := range tests {

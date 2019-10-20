@@ -1,4 +1,4 @@
-POST http://{{host}}:{{port}}/v1/users/new
+POST http://{{host}}:{{port}}/v1/users
 Content-Type: application/json
 
 {
@@ -9,7 +9,7 @@ Content-Type: application/json
 
 ###
 
-POST http://{{host}}:{{port}}/v1/users/new
+POST http://{{host}}:{{port}}/v1/users
 Content-Type: application/json
 
 {
@@ -20,7 +20,7 @@ Content-Type: application/json
 
 ###
 
-POST http://{{host}}:{{port}}/v1/auth/login
+POST http://{{host}}:{{port}}/v1/sessions
 Content-Type: application/json
 
 {
@@ -56,7 +56,13 @@ Content-Type: application/json
 
 ###
 
-PUT http://{{host}}:{{port}}/v1/users/use/followers
+POST http://{{host}}:{{port}}/v1/users/user2/followers
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+DELETE http://{{host}}:{{port}}/v1/users/user2/followers
 Authorization: Bearer {{token}}
 Accept: application/json
 
