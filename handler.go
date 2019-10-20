@@ -97,8 +97,7 @@ func CreatePostHandler(svc Service) http.Handler {
 
 func GetProfileHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		params := httprouter.ParamsFromContext(r.Context())
-		username := strings.TrimSpace(params.ByName("username"))
+		username := getNameFromRequestParams(r, "username")
 
 		w.Header().Set("Content-Type", "application/json")
 		if username == "" {
@@ -142,6 +141,31 @@ func EditProfileHandler(svc Service) http.Handler {
 	})
 }
 
+func CreateRelationshipHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		username := getNameFromRequestParams(r, "username")
+		if username == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		id, ok := getUserIDFromContext(r.Context())
+		if !ok {
+			encodeError(ErrEmptyContext, w)
+			return
+		}
+		err := svc.CreateRelationshipFor(ID(id), username)
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	})
+}
+
 func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, ok := getUserIDFromContext(r.Context())
@@ -182,6 +206,12 @@ func RequireAuth(f http.Handler) http.Handler {
 	})
 }
 
+func getNameFromRequestParams(r *http.Request, name string) string {
+	params := httprouter.ParamsFromContext(r.Context())
+	username := strings.TrimSpace(params.ByName(name))
+	return username
+}
+
 func getUserIDFromContext(ctx context.Context) (id string, ok bool) {
 	id, ok = ctx.Value(idKey).(string)
 	return
@@ -204,14 +234,16 @@ func getJWTToken(id string) (string, error) {
 
 func encodeError(err error, w http.ResponseWriter) {
 	switch err {
-	case ErrExistingUsername, ErrExistingEmail:
+	case ErrInvalidCredentials, ErrInvalidID:
+		w.WriteHeader(http.StatusUnauthorized)
+	case ErrCantFollowSelf:
+		w.WriteHeader(http.StatusForbidden)
+	case ErrNotFound:
+		w.WriteHeader(http.StatusNotFound)
+	case ErrExistingUsername, ErrExistingEmail, ErrAlreadyFollowing:
 		w.WriteHeader(http.StatusConflict)
 	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername, ErrBioTooLong:
 		w.WriteHeader(http.StatusUnprocessableEntity)
-	case ErrInvalidCredentials, ErrInvalidID:
-		w.WriteHeader(http.StatusUnauthorized)
-	case ErrNotFound:
-		w.WriteHeader(http.StatusNotFound)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}

@@ -46,6 +46,7 @@ var (
 	ErrBioTooLong         = errors.New("bio cannot be more than 140 characters")
 	ErrCantFollowSelf     = errors.New("can't follow yourself")
 	ErrCantUnFollowSelf   = errors.New("can't unfollow yourself")
+	ErrAlreadyFollowing   = errors.New("already following user")
 )
 
 func (u1 *user) IsFollowing(u2 *user) bool {
@@ -57,10 +58,8 @@ func (u1 *user) IsFollowing(u2 *user) bool {
 }
 
 func (u1 *user) Follow(u2 *user) {
-	if !u1.IsFollowing(u2) {
-		u1.Friends[u2.ID] = u2
-		u2.Followers[u1.ID] = u1
-	}
+	u1.Friends[u2.ID] = u2
+	u2.Followers[u1.ID] = u1
 }
 
 func (u1 *user) Unfollow(u2 *user) {

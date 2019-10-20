@@ -32,4 +32,5 @@ notes.md
 *.png
 *.test
 vendor
+api/rest-client.*.env.json
 blog

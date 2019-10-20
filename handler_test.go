@@ -355,7 +355,7 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 		r2, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/v1/users/%s", u), nil)
 
 		if tt.withCtx {
-			r = r.WithContext(context.WithValue(r.Context(), idKey, tt.id))
+			r = setIDInRequestContext(r, tt.id)
 		}
 
 		router := httprouter.New()
@@ -396,6 +396,54 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 			r3 = r3.WithContext(context.WithValue(r3.Context(), idKey, tt.id))
 			router.ServeHTTP(w, r3)
 		}
+	}
+}
+
+func (hs *HandlerTestSuite) TestCreateRelationshipHandler() {
+	uid := string(hs.userID)
+	nilErr := errors.New("")
+
+	u := "followUser"
+	otherReq := registerUserRequest{u, "password", "f@u.co"}
+	_, err := hs.svc.RegisterNewUser(otherReq)
+	assert.Nil(hs.T(), err)
+
+	tests := []struct {
+		id, username string
+		withCtx      bool
+		wantCode     int
+		wantErr      error
+	}{
+		{id: uid, username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{id: uid, username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
+		{id: uid, username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
+		{id: uid, username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantFollowSelf},
+		{id: uid, username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: nilErr},
+		{id: uid, username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrAlreadyFollowing},
+	}
+
+	for _, tt := range tests {
+		u := fmt.Sprintf("/v1/users/%s/followers", tt.username)
+		r, _ := http.NewRequest(http.MethodPut, u, nil)
+
+		if tt.withCtx {
+			r = setIDInRequestContext(r, tt.id)
+		}
+
+		router := httprouter.New()
+		router.Handler(http.MethodPut, "/v1/users/:username/followers", CreateRelationshipHandler(hs.svc))
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+
+		var res struct {
+			Err string `json:"error,omitempty"`
+		}
+
+		_ = json.NewDecoder(w.Body).Decode(&res)
+
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
+		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
 	}
 }
 
@@ -487,6 +535,10 @@ func (hs *HandlerTestSuite) TestLastSeenMiddleware() {
 		assert.Equal(hs.T(), tt.wantCalled, called)
 		assert.Equal(hs.T(), tt.wantLS, res.Profile.LastSeen.After(now))
 	}
+}
+
+func setIDInRequestContext(r *http.Request, id string) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), idKey, id))
 }
 
 func TestHandlerSuite(t *testing.T) {

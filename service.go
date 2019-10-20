@@ -22,6 +22,7 @@ type Service interface {
 	RemoveRelationshipFor(id ID, username string) error
 	GetUserFriends(username string) ([]UserInfo, error)
 	GetUserFollowers(username string) ([]UserInfo, error)
+	GetTimeline(id ID) ([]postResponse, error)
 }
 
 type service struct {
@@ -283,6 +284,10 @@ func (svc *service) CreateRelationshipFor(id ID, username string) error {
 
 	if u1.username == username {
 		return ErrCantFollowSelf
+	}
+
+	if u1.IsFollowing(u2) {
+		return ErrAlreadyFollowing
 	}
 
 	u1.Follow(u2)

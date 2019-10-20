@@ -1,4 +1,4 @@
-POST http://localhost:8090/v1/users/new
+POST http://{{host}}:{{port}}/v1/users/new
 Content-Type: application/json
 
 {
@@ -9,7 +9,7 @@ Content-Type: application/json
 
 ###
 
-POST http://localhost:8090/v1/users/new
+POST http://{{host}}:{{port}}/v1/users/new
 Content-Type: application/json
 
 {
@@ -20,7 +20,7 @@ Content-Type: application/json
 
 ###
 
-POST http://localhost:8090/v1/auth/login
+POST http://{{host}}:{{port}}/v1/auth/login
 Content-Type: application/json
 
 {
@@ -29,8 +29,8 @@ Content-Type: application/json
 }
 ###
 
-POST http://localhost:8090/v1/posts
-Authorization: Bearer <token.goes.here>
+POST http://{{host}}:{{port}}/v1/posts
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
@@ -39,19 +39,25 @@ Content-Type: application/json
 
 ###
 
-GET http://localhost:8090/v1/users/user
-Authorization: Bearer <token.goes.here>
+GET http://{{host}}:{{port}}/v1/users/user
+Authorization: Bearer {{token}}
 Accept: application/json
 
 ###
 
-PATCH http://localhost:8090/v1/users
-Authorization: Bearer <token.goes.here>
+PATCH http://{{host}}:{{port}}/v1/users
+Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "username": "user3",
   "bio": "Bios"
 }
+
+###
+
+PUT http://{{host}}:{{port}}/v1/users/use/followers
+Authorization: Bearer {{token}}
+Accept: application/json
 
 ###

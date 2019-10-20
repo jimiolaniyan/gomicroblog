@@ -262,7 +262,7 @@ func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
 		{id: nextID(), username: "nonexistent", wantErr: ErrNotFound},
 		{id: u1.ID, username: u1.username, wantErr: ErrCantFollowSelf},
 		{id: u1.ID, username: u2.username, wantErr: nil, wantFollow: true, wantLen: 1},
-		{id: u1.ID, username: u2.username, wantErr: nil, wantFollow: true, wantLen: 1}, // ensure follow happens once
+		{id: u1.ID, username: u2.username, wantErr: ErrAlreadyFollowing, wantFollow: true, wantLen: 1},
 	}
 
 	for _, tt := range tests {
