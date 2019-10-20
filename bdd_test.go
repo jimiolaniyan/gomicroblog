@@ -202,7 +202,7 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 	})
 }
 
-func (bs *BddTestSuite) TestFollowingBetweenUsers() {
+func (bs *BddTestSuite) TestRelationships_Create() {
 	Convey("Given two users U1 and U2 with no relationship", bs.T(), func() {
 		u1 := duplicateUser(bs.svc, *bs.user, "U1")
 		u2 := duplicateUser(bs.svc, *bs.user, "U2")
@@ -238,6 +238,50 @@ func (bs *BddTestSuite) TestFollowingBetweenUsers() {
 						Reset(func() {
 							_ = bs.svc.users.Delete(u2.ID)
 							_ = bs.svc.users.Delete(u1.ID)
+						})
+					})
+				})
+			})
+		})
+	})
+}
+
+func (bs *BddTestSuite) TestRelationships_Remove() {
+	Convey("Given two users U1 and U1", bs.T(), func() {
+		u1 := duplicateUser(bs.svc, *bs.user, "newU1")
+		u2 := duplicateUser(bs.svc, *bs.user, "newU2")
+
+		Convey("With U1 following U2", func() {
+			u1.Follow(u2)
+			So(u1.IsFollowing(u2), ShouldBeTrue)
+
+			Convey("When U1 unfollows u2", func() {
+				err := bs.svc.RemoveRelationshipFor(u1.ID, u2.username)
+				So(err, ShouldBeNil)
+
+				Convey("Then U1 is not following U2", func() {
+					So(u1.IsFollowing(u2), ShouldBeFalse)
+
+					Convey("And U2 is not in U1's friends list", func() {
+						friends, err := bs.svc.GetUserFriends(u1.username)
+
+						So(err, ShouldBeNil)
+
+						userInfo := getUserInfoFromList(friends, u2.ID)
+						So(userInfo, ShouldResemble, UserInfo{})
+
+						Convey("And U1 is not in U2's follower's list", func() {
+							followers, err := bs.svc.GetUserFollowers(u2.username)
+
+							So(err, ShouldBeNil)
+
+							userInfo := getUserInfoFromList(followers, u1.ID)
+							So(userInfo, ShouldResemble, UserInfo{})
+
+							Reset(func() {
+								_ = bs.svc.users.Delete(u2.ID)
+								_ = bs.svc.users.Delete(u1.ID)
+							})
 						})
 					})
 				})

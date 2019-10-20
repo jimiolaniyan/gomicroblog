@@ -30,8 +30,8 @@ type user struct {
 	createdAt time.Time
 	lastSeen  time.Time
 	bio       string
-	Friends   []*user
-	Followers []*user
+	Friends   map[ID]*user
+	Followers map[ID]*user
 }
 
 var (
@@ -45,21 +45,28 @@ var (
 	ErrInvalidCredentials = errors.New("invalid username or password")
 	ErrBioTooLong         = errors.New("bio cannot be more than 140 characters")
 	ErrCantFollowSelf     = errors.New("can't follow yourself")
+	ErrCantUnFollowSelf   = errors.New("can't unfollow yourself")
 )
 
 func (u1 *user) IsFollowing(u2 *user) bool {
-	for _, friend := range u1.Friends {
-		if friend.ID == u2.ID {
-			return true
-		}
+	if _, ok := u1.Friends[u2.ID]; ok {
+		return true
 	}
+
 	return false
 }
 
 func (u1 *user) Follow(u2 *user) {
 	if !u1.IsFollowing(u2) {
-		u1.Friends = append(u1.Friends, u2)
-		u2.Followers = append(u2.Followers, u1)
+		u1.Friends[u2.ID] = u2
+		u2.Followers[u1.ID] = u1
+	}
+}
+
+func (u1 *user) Unfollow(u2 *user) {
+	if u1.IsFollowing(u2) {
+		delete(u1.Friends, u2.ID)
+		delete(u2.Followers, u1.ID)
 	}
 }
 
@@ -68,7 +75,7 @@ func NewUser(username, email string) (*user, error) {
 		return nil, err
 	}
 
-	return &user{username: username, email: email}, nil
+	return &user{username: username, email: email, Friends: map[ID]*user{}, Followers: map[ID]*user{}}, nil
 }
 
 func validateArgs(username string, email string) error {

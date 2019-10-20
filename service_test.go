@@ -279,6 +279,43 @@ func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
 	_ = ts.svc.users.Delete(u2.ID)
 }
 
+func (ts *ServiceTestSuite) TestRemoveRelationshipFor() {
+	u2 := duplicateUser(ts.svc, *ts.user, "abc")
+	u1 := duplicateUser(ts.svc, *ts.user, "xyz")
+	u1.Follow(u2)
+
+	tests := []struct {
+		id         ID
+		wantErr    error
+		username   string
+		wantFollow bool
+		wantLen    int
+	}{
+		{id: "invalid", wantErr: ErrInvalidID},
+		{id: nextID(), wantErr: ErrInvalidUsername},
+		{id: nextID(), username: "nonexistent", wantErr: ErrNotFound},
+		{id: u1.ID, username: u1.username, wantErr: ErrCantUnFollowSelf},
+		{id: u1.ID, username: u2.username, wantErr: nil},
+		{id: u1.ID, username: u2.username, wantErr: nil}, // ensure unfollow happens once
+	}
+
+	for _, tt := range tests {
+		err := ts.svc.RemoveRelationshipFor(tt.id, tt.username)
+
+		assert.Equal(ts.T(), tt.wantErr, err)
+
+		if err == nil {
+			assert.Equal(ts.T(), tt.wantFollow, u1.IsFollowing(u2))
+			assert.Equal(ts.T(), tt.wantLen, len(u1.Friends))
+			assert.Equal(ts.T(), tt.wantLen, len(u2.Followers))
+		}
+	}
+
+	// clean up
+	_ = ts.svc.users.Delete(u1.ID)
+	_ = ts.svc.users.Delete(u2.ID)
+}
+
 func (ts *ServiceTestSuite) TestRelationships() {
 	u1 := duplicateUser(ts.svc, *ts.user, "u1")
 	u2 := duplicateUser(ts.svc, *ts.user, "u2")
