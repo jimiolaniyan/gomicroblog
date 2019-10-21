@@ -67,3 +67,15 @@ Authorization: Bearer {{token}}
 Accept: application/json
 
 ###
+
+GET http://{{host}}:{{port}}/v1/users/user/friends
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+GET http://{{host}}:{{port}}/v1/users/user/followers
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###

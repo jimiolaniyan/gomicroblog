@@ -121,6 +121,7 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 					Bio:      "",
 					Joined:   profile.Joined,
 					LastSeen: profile.LastSeen,
+					Posts:    []postResponse{},
 				}
 
 				So(profile, ShouldResemble, expectedProfile)

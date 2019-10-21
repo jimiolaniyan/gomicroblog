@@ -385,7 +385,7 @@ func (svc *service) findUser(username string) (*user, error) {
 }
 
 func buildUserInfosFromUsers(users map[ID]*user) []UserInfo {
-	var infos []UserInfo
+	var infos = []UserInfo{}
 	for _, user := range users {
 		infos = append(infos, UserInfo{
 			ID:       user.ID,
@@ -420,7 +420,7 @@ func updateBio(bio *string, user *user) error {
 }
 
 func buildPostResponses(posts []*post, user *user) []postResponse {
-	var res []postResponse
+	var res = []postResponse{}
 
 	for _, p := range posts {
 		pr := postResponse{

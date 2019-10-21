@@ -288,6 +288,7 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 	for _, tt := range tests {
 		url := fmt.Sprintf("%s/v1/users/%s", host, tt.username)
 		req, _ := http.NewRequest(http.MethodGet, url, nil)
+
 		w := httptest.NewRecorder()
 		router := httprouter.New()
 
@@ -443,6 +444,9 @@ func (hs *HandlerTestSuite) TestCreateRelationshipHandler() {
 		assert.Equal(hs.T(), tt.wantCode, w.Code)
 		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
 	}
+
+	// clean up
+	_ = hs.svc.RemoveRelationshipFor(ID(uid), u)
 }
 
 func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
@@ -488,6 +492,77 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 		assert.Equal(hs.T(), tt.wantCode, w.Code)
 		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
 	}
+}
+
+func (hs *HandlerTestSuite) TestGetUserFriends() {
+	u := "friend"
+	_, _ = hs.svc.RegisterNewUser(registerUserRequest{u, "password", "uf@uf.co"})
+	uid := string(hs.userID)
+	_ = hs.svc.CreateRelationshipFor(ID(uid), u)
+
+	tests := []struct {
+		username           string
+		wantCode, wantFLen int
+	}{
+		{username: "  ", wantCode: http.StatusBadRequest},
+		{username: "nonexistent", wantCode: http.StatusNotFound},
+		{username: hs.req.Username, wantCode: http.StatusOK, wantFLen: 1},
+	}
+
+	for _, tt := range tests {
+		url := fmt.Sprintf("/v1/users/%s/friends", tt.username)
+		r, _ := http.NewRequest(http.MethodGet, url, nil)
+
+		router := httprouter.New()
+		router.Handler(http.MethodGet, "/v1/users/:username/friends", GetUserFriendsHandler(hs.svc))
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+
+		var res []UserInfo
+
+		_ = json.NewDecoder(w.Body).Decode(&res)
+
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
+		assert.Equal(hs.T(), tt.wantFLen, len(res))
+	}
+
+	_ = hs.svc.RemoveRelationshipFor(ID(uid), u)
+}
+
+func (hs *HandlerTestSuite) TestGetUserFollowers() {
+	u := "follower"
+	id, _ := hs.svc.RegisterNewUser(registerUserRequest{u, "password", "usf@uf.co"})
+	_ = hs.svc.CreateRelationshipFor(id, hs.req.Username)
+
+	tests := []struct {
+		username           string
+		wantCode, wantFLen int
+	}{
+		{username: "  ", wantCode: http.StatusBadRequest},
+		{username: "nonexistent", wantCode: http.StatusNotFound},
+		{username: hs.req.Username, wantCode: http.StatusOK, wantFLen: 1},
+	}
+
+	for _, tt := range tests {
+		url := fmt.Sprintf("/v1/users/%s/followers", tt.username)
+		r, _ := http.NewRequest(http.MethodGet, url, nil)
+
+		router := httprouter.New()
+		router.Handler(http.MethodGet, "/v1/users/:username/followers", GetUserFollowersHandler(hs.svc))
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+
+		var res []UserInfo
+
+		_ = json.NewDecoder(w.Body).Decode(&res)
+
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
+		assert.Equal(hs.T(), tt.wantFLen, len(res))
+	}
+
+	_ = hs.svc.RemoveRelationshipFor(id, u)
 }
 
 var invalidToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"

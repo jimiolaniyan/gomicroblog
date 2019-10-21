@@ -97,9 +97,9 @@ func CreatePostHandler(svc Service) http.Handler {
 
 func GetProfileHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		username := getNameFromRequestParams(r, "username")
-
 		w.Header().Set("Content-Type", "application/json")
+
+		username := getValueFromRequestParams(r, "username")
 		if username == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -177,6 +177,50 @@ func RemoveRelationshipHandler(svc Service) http.Handler {
 	})
 }
 
+func GetUserFriendsHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		username := getValueFromRequestParams(r, "username")
+		if username == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		friends, err := svc.GetUserFriends(username)
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+
+		if err = json.NewEncoder(w).Encode(friends); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+}
+
+func GetUserFollowersHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		username := getValueFromRequestParams(r, "username")
+		if username == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		friends, err := svc.GetUserFollowers(username)
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+
+		if err = json.NewEncoder(w).Encode(friends); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+}
+
 func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if id, ok := getUserIDFromContext(r.Context()); ok {
@@ -213,7 +257,7 @@ func RequireAuth(f http.Handler) http.Handler {
 }
 
 func getRelationshipRequestParams(r *http.Request, w http.ResponseWriter) (string, string, bool) {
-	username := getNameFromRequestParams(r, "username")
+	username := getValueFromRequestParams(r, "username")
 	if username == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return "", "", false
@@ -243,10 +287,9 @@ func parseTokenStr(tokenStr string) (*jwt.Token, error) {
 	return token, err
 }
 
-func getNameFromRequestParams(r *http.Request, name string) string {
+func getValueFromRequestParams(r *http.Request, name string) string {
 	params := httprouter.ParamsFromContext(r.Context())
-	username := strings.TrimSpace(params.ByName(name))
-	return username
+	return strings.TrimSpace(params.ByName(name))
 }
 
 func getUserIDFromContext(ctx context.Context) (id string, ok bool) {
