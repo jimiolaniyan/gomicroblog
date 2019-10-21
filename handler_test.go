@@ -490,8 +490,9 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 	}
 }
 
+var invalidToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"
+
 func TestRequireAuthMiddleware(t *testing.T) {
-	invalidToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"
 	validToken, _ := getJWTToken("randomid")
 
 	tests := []struct {
@@ -499,7 +500,7 @@ func TestRequireAuthMiddleware(t *testing.T) {
 		wantCode   int
 		wantID     string
 	}{
-		{authHeader: "", wantCode: http.StatusUnauthorized},
+		{wantCode: http.StatusUnauthorized},
 		{authHeader: "k", wantCode: http.StatusUnauthorized},
 		{authHeader: "Random random", wantCode: http.StatusUnauthorized},
 		{authHeader: "Bearer ", wantCode: http.StatusUnauthorized},
@@ -534,25 +535,25 @@ func TestRequireAuthMiddleware(t *testing.T) {
 
 func (hs *HandlerTestSuite) TestLastSeenMiddleware() {
 	now := time.Now().UTC()
+	validToken, _ := getJWTToken(string(hs.userID))
+
 	var called bool
 	f := func(w http.ResponseWriter, r *http.Request) {
-		if id, _ := getUserIDFromContext(r.Context()); id != "" {
-			called = true
-		}
+		called = true
 	}
 
-	l := LastSeenMiddleware(http.HandlerFunc(f), hs.svc)
+	ls := LastSeenMiddleware(http.HandlerFunc(f), hs.svc)
 	r, _ := http.NewRequest("", "/doesnt-matter", nil)
-	pr, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("/v1/users/%s", hs.req.Username), nil)
 
 	tests := []struct {
-		id                          string
-		wantCode                    int
-		withCtx, wantLS, wantCalled bool
+		id, token                       string
+		withCtx, withCtxHeader          bool
+		wantUpdatedLastSeen, wantCalled bool
 	}{
-		{wantCode: http.StatusInternalServerError},
-		{id: "invalid", withCtx: true, wantCode: http.StatusNotFound},
-		{id: string(hs.userID), withCtx: true, wantCode: http.StatusOK, wantLS: true, wantCalled: true},
+		{wantCalled: true},
+		{token: invalidToken, withCtxHeader: true, wantCalled: true},
+		{token: validToken, withCtxHeader: true, wantUpdatedLastSeen: true, wantCalled: true},
+		{id: string(hs.userID), withCtx: true, wantUpdatedLastSeen: true, wantCalled: true},
 	}
 
 	for _, tt := range tests {
@@ -560,23 +561,23 @@ func (hs *HandlerTestSuite) TestLastSeenMiddleware() {
 			r = r.WithContext(context.WithValue(r.Context(), idKey, tt.id))
 		}
 
-		w := httptest.NewRecorder()
-		router := httprouter.New()
-		router.Handler(http.MethodGet, "/doesnt-matter", l)
-		router.Handler(http.MethodGet, "/v1/users/:username", GetProfileHandler(hs.svc))
-		router.ServeHTTP(w, r)
-		router.ServeHTTP(w, pr)
-
-		var res struct {
-			Profile Profile `json:"profile,omitempty"`
+		if tt.withCtxHeader {
+			r.Header.Set("Authorization", "Bearer "+validToken)
 		}
 
-		_ = json.NewDecoder(w.Body).Decode(&res)
+		w := httptest.NewRecorder()
+		router := httprouter.New()
+		router.Handler(http.MethodGet, "/doesnt-matter", ls)
+		router.ServeHTTP(w, r)
 
-		assert.IsType(hs.T(), new(http.Handler), &l)
-		assert.Equal(hs.T(), tt.wantCode, w.Code)
+		assert.IsType(hs.T(), new(http.Handler), &ls)
+		assert.Equal(hs.T(), http.StatusOK, w.Code)
 		assert.Equal(hs.T(), tt.wantCalled, called)
-		assert.Equal(hs.T(), tt.wantLS, res.Profile.LastSeen.After(now))
+
+		if tt.wantUpdatedLastSeen {
+			p, _ := hs.svc.GetProfile(hs.req.Username)
+			assert.Equal(hs.T(), tt.wantUpdatedLastSeen, p.LastSeen.After(now))
+		}
 	}
 }
 

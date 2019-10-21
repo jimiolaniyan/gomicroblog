@@ -177,6 +177,41 @@ func RemoveRelationshipHandler(svc Service) http.Handler {
 	})
 }
 
+func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if id, ok := getUserIDFromContext(r.Context()); ok {
+			_ = svc.UpdateLastSeen(ID(id))
+			f.ServeHTTP(w, r)
+			return
+		}
+
+		tokenStr := getTokenStrFromRequest(r)
+		if token, err := parseTokenStr(tokenStr); err == nil {
+			if id, ok := token.Claims.(jwt.MapClaims)["sub"].(string); ok {
+				_ = svc.UpdateLastSeen(ID(id))
+			}
+		}
+
+		f.ServeHTTP(w, r)
+	})
+}
+
+func RequireAuth(f http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenStr := getTokenStrFromRequest(r)
+
+		token, err := parseTokenStr(tokenStr)
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		ctx := addClaimsToCtx(r.Context(), token)
+
+		f.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func getRelationshipRequestParams(r *http.Request, w http.ResponseWriter) (string, string, bool) {
 	username := getNameFromRequestParams(r, "username")
 	if username == "" {
@@ -193,44 +228,19 @@ func getRelationshipRequestParams(r *http.Request, w http.ResponseWriter) (strin
 	return username, id, true
 }
 
-func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, ok := getUserIDFromContext(r.Context())
-		if !ok {
-			encodeError(ErrEmptyContext, w)
-			return
-		}
-
-		err := svc.UpdateLastSeen(ID(id))
-		if err != nil {
-			encodeError(err, w)
-			return
-		}
-		f.ServeHTTP(w, r)
-	})
+func addClaimsToCtx(ctx context.Context, token *jwt.Token) context.Context {
+	claims := token.Claims.(jwt.MapClaims)
+	return context.WithValue(ctx, idKey, claims["sub"])
 }
 
-func RequireAuth(f http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenStr := getTokenFromRequest(r)
-
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("error verifying signing method")
-			}
-			return []byte("e624d92e3fa438b6a8fac4f698e977cd"), nil
-		})
-
-		if err != nil {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
+func parseTokenStr(tokenStr string) (*jwt.Token, error) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("error verifying signing method")
 		}
-
-		claims := token.Claims.(jwt.MapClaims)
-		ctx := context.WithValue(r.Context(), idKey, claims["sub"])
-
-		f.ServeHTTP(w, r.WithContext(ctx))
+		return []byte("e624d92e3fa438b6a8fac4f698e977cd"), nil
 	})
+	return token, err
 }
 
 func getNameFromRequestParams(r *http.Request, name string) string {
@@ -244,7 +254,7 @@ func getUserIDFromContext(ctx context.Context) (id string, ok bool) {
 	return
 }
 
-func getTokenFromRequest(r *http.Request) string {
+func getTokenStrFromRequest(r *http.Request) string {
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || strings.ToUpper(parts[0]) != "BEARER" {

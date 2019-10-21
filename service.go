@@ -11,18 +11,18 @@ import (
 )
 
 type Service interface {
-	RegisterNewUser(req registerUserRequest) (ID, error)
-	ValidateUser(req validateUserRequest) (ID, error)
-	CreatePost(id ID, body string) (PostID, error)
-	GetUserPosts(username string) ([]*post, error)
-	GetProfile(username string) (Profile, error)
-	UpdateLastSeen(id ID) error
-	EditProfile(id ID, req editProfileRequest) error
-	CreateRelationshipFor(id ID, username string) error
-	RemoveRelationshipFor(id ID, username string) error
-	GetUserFriends(username string) ([]UserInfo, error)
-	GetUserFollowers(username string) ([]UserInfo, error)
-	GetTimeline(id ID) ([]postResponse, error)
+	RegisterNewUser(req registerUserRequest) (ID, error)  //auth
+	ValidateUser(req validateUserRequest) (ID, error)     //auth
+	CreatePost(id ID, body string) (PostID, error)        //messaging
+	GetUserPosts(username string) ([]*post, error)        //messaging
+	GetProfile(username string) (Profile, error)          //profile
+	UpdateLastSeen(id ID) error                           //profile
+	EditProfile(id ID, req editProfileRequest) error      //profile
+	CreateRelationshipFor(id ID, username string) error   //profile
+	RemoveRelationshipFor(id ID, username string) error   //profile
+	GetUserFriends(username string) ([]UserInfo, error)   //profile
+	GetUserFollowers(username string) ([]UserInfo, error) //profile
+	GetTimeline(id ID) ([]postResponse, error)            //messaging
 }
 
 type service struct {
