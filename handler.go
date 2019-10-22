@@ -120,8 +120,9 @@ func GetProfileHandler(svc Service) http.Handler {
 
 func EditProfileHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		request, err := decodeEditProfileRequest(r.Body)
 		w.Header().Set("Content-Type", "application/json")
+
+		request, err := decodeEditProfileRequest(r.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -143,82 +144,65 @@ func EditProfileHandler(svc Service) http.Handler {
 
 func CreateRelationshipHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		username, id, ok := getRelationshipRequestParams(r, w)
-		if !ok {
-			return
-		}
-
-		if err := svc.CreateRelationshipFor(ID(id), username); err != nil {
-			encodeError(err, w)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
-		return
+		handleRelationship(w, r, svc.CreateRelationshipFor)
 	})
 }
 
 func RemoveRelationshipHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		username, id, ok := getRelationshipRequestParams(r, w)
-		if !ok {
-			return
-		}
-
-		if err := svc.RemoveRelationshipFor(ID(id), username); err != nil {
-			encodeError(err, w)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
-		return
+		handleRelationship(w, r, svc.RemoveRelationshipFor)
 	})
+}
+
+type hFunc func(ID, string) error
+
+func handleRelationship(w http.ResponseWriter, r *http.Request, f hFunc) {
+	username, id, ok := getRelationshipRequestParams(r, w)
+	if !ok {
+		return
+	}
+
+	if err := f(ID(id), username); err != nil {
+		encodeError(err, w)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	return
 }
 
 func GetUserFriendsHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		username := getValueFromRequestParams(r, "username")
-		if username == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		friends, err := svc.GetUserFriends(username)
-		if err != nil {
-			encodeError(err, w)
-			return
-		}
-
-		if err = json.NewEncoder(w).Encode(friends); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+		getRelationships(w, r, svc.GetUserFriends)
 	})
 }
 
 func GetUserFollowersHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		username := getValueFromRequestParams(r, "username")
-		if username == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
-		friends, err := svc.GetUserFollowers(username)
-		if err != nil {
-			encodeError(err, w)
-			return
-		}
-
-		if err = json.NewEncoder(w).Encode(friends); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
+		getRelationships(w, r, svc.GetUserFollowers)
 	})
+}
+
+type gFunc func(string) ([]UserInfo, error)
+
+func getRelationships(w http.ResponseWriter, r *http.Request, f gFunc) {
+	w.Header().Set("Content-Type", "application/json")
+
+	username := getValueFromRequestParams(r, "username")
+	if username == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	friends, err := f(username)
+	if err != nil {
+		encodeError(err, w)
+		return
+	}
+
+	if err = json.NewEncoder(w).Encode(friends); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 }
 
 func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
