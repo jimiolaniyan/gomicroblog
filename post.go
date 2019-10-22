@@ -14,6 +14,7 @@ type PostRepository interface {
 	FindByID(id PostID) (post, error)
 	Store(post post) error
 	FindLatestPostsForUser(id ID) ([]*post, error)
+	FindLatestPostsForUserAndFriends(user *user) ([]*post, error)
 }
 
 type PostID string

@@ -11,13 +11,18 @@ import (
 )
 
 type Service interface {
-	RegisterNewUser(req registerUserRequest) (ID, error)
-	ValidateUser(req validateUserRequest) (ID, error)
-	CreatePost(id ID, body string) (PostID, error)
-	GetUserPosts(username string) ([]*post, error)
-	GetProfile(username string) (Profile, error)
-	UpdateLastSeen(id ID) error
-	EditProfile(id ID, req editProfileRequest) error
+	RegisterNewUser(req registerUserRequest) (ID, error)  //auth
+	ValidateUser(req validateUserRequest) (ID, error)     //auth
+	CreatePost(id ID, body string) (PostID, error)        //messaging
+	GetUserPosts(username string) ([]*post, error)        //messaging
+	GetProfile(username string) (Profile, error)          //profile
+	UpdateLastSeen(id ID) error                           //profile
+	EditProfile(id ID, req editProfileRequest) error      //profile
+	CreateRelationshipFor(id ID, username string) error   //profile
+	RemoveRelationshipFor(id ID, username string) error   //profile
+	GetUserFriends(username string) ([]UserInfo, error)   //profile
+	GetUserFollowers(username string) ([]UserInfo, error) //profile
+	GetTimeline(id ID) ([]postResponse, error)            //messaging
 }
 
 type service struct {
@@ -31,6 +36,11 @@ type registerUserRequest struct {
 	Email    string
 }
 
+type registerUserResponse struct {
+	ID  ID    `json:"id,omitempty"`
+	Err error `json:"error,omitempty"`
+}
+
 type validateUserRequest struct {
 	Username, Password string
 }
@@ -39,23 +49,18 @@ type createPostRequest struct {
 	Body string
 }
 
+type createPostResponse struct {
+	ID PostID `json:"id"`
+}
+
 type editProfileRequest struct {
 	Username *string
 	Bio      *string
 }
 
-type registerUserResponse struct {
-	ID  ID    `json:"id,omitempty"`
-	Err error `json:"error,omitempty"`
-}
-
-type createPostResponse struct {
-	ID PostID `json:"id"`
-}
-
 type Relationships struct {
-	Followers []user `json:"followers"`
-	Following []user `json:"following"`
+	Followers int `json:"followers"`
+	Friends   int `json:"following"`
 }
 
 type Profile struct {
@@ -86,6 +91,18 @@ type profileResponse struct {
 	Profile *Profile `json:"profile,omitempty"`
 	URL     string   `json:"url"`
 	Err     error    `json:"err,omitempty"`
+}
+
+type UserInfo struct {
+	ID       ID        `json:"id"`
+	Username string    `json:"username"`
+	Avatar   string    `json:"avatar_url"`
+	Bio      string    `json:"bio"`
+	Joined   time.Time `json:"joined"`
+}
+
+func NewService(users Repository, posts PostRepository) Service {
+	return &service{users: users, posts: posts}
 }
 
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
@@ -151,12 +168,13 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 	if !IsValidID(string(id)) {
 		return "", ErrInvalidID
 	}
-	_, err := svc.users.FindByID(id)
+
+	user, err := svc.users.FindByID(id)
 	if err != nil {
 		return "", err
 	}
 
-	author := Author{UserID: id}
+	author := Author{UserID: user.ID}
 	post, err := NewPost(author, body)
 	if err != nil {
 		return "", err
@@ -206,7 +224,11 @@ func (svc *service) GetProfile(username string) (Profile, error) {
 		Bio:      user.bio,
 		Joined:   user.createdAt,
 		LastSeen: user.lastSeen,
-		Posts:    buildPostResponses(posts, user),
+		Relationships: Relationships{
+			Followers: len(user.Followers),
+			Friends:   len(user.Friends),
+		},
+		Posts: buildPostResponses(posts, user),
 	}, nil
 }
 
@@ -235,8 +257,145 @@ func (svc *service) EditProfile(id ID, req editProfileRequest) error {
 			return err
 		}
 	}
+	// TODO May need to call svc.users.Store with a real DB
 
 	return nil
+}
+
+func (svc *service) UpdateLastSeen(id ID) error {
+	if !IsValidID(string(id)) {
+		return ErrNotFound
+	}
+
+	user, err := svc.users.FindByID(id)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	user.lastSeen = time.Now().UTC()
+	err = svc.users.Store(user)
+	if err != nil {
+		return fmt.Errorf("error updating last seen: %s", err.Error())
+	}
+	return nil
+}
+
+func (svc *service) CreateRelationshipFor(id ID, username string) error {
+	u1, u2, err := svc.getU1U2(id, username)
+	if err != nil {
+		return err
+	}
+
+	if u1.username == username {
+		return ErrCantFollowSelf
+	}
+
+	if u1.IsFollowing(u2) {
+		return ErrAlreadyFollowing
+	}
+
+	u1.Follow(u2)
+	// TODO May need to call svc.users.Store with a real DB
+	return nil
+}
+
+func (svc *service) RemoveRelationshipFor(id ID, username string) error {
+	u1, u2, err := svc.getU1U2(id, username)
+	if err != nil {
+		return err
+	}
+
+	if u1.username == username {
+		return ErrCantUnFollowSelf
+	}
+
+	if !u1.IsFollowing(u2) {
+		return ErrNotFollowing
+	}
+
+	u1.Unfollow(u2)
+	return nil
+}
+
+func (svc *service) GetUserFriends(username string) ([]UserInfo, error) {
+	user, err := svc.findUser(username)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildUserInfosFromUsers(user.Friends), nil
+}
+
+func (svc *service) GetUserFollowers(username string) ([]UserInfo, error) {
+	user, err := svc.findUser(username)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildUserInfosFromUsers(user.Followers), nil
+}
+
+func (svc *service) GetTimeline(id ID) ([]postResponse, error) {
+	if !IsValidID(string(id)) {
+		return nil, ErrInvalidID
+	}
+
+	user, err := svc.users.FindByID(id)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	posts, _ := svc.posts.FindLatestPostsForUserAndFriends(user)
+
+	return buildPostResponses(posts, user), nil
+}
+
+// TODO refactor this to use get U1 and U2 separately
+func (svc *service) getU1U2(id ID, username string) (u1 *user, u2 *user, err error) {
+	if !IsValidID(string(id)) {
+		return nil, nil, ErrInvalidID
+	}
+
+	if username == "" {
+		return nil, nil, ErrInvalidUsername
+	}
+
+	u1, err = svc.users.FindByID(id)
+	if err != nil {
+		return nil, nil, ErrNotFound
+	}
+
+	u2, err = svc.users.FindByName(username)
+	if err != nil {
+		return nil, nil, ErrNotFound
+	}
+
+	return
+}
+
+func (svc *service) findUser(username string) (*user, error) {
+	if username == "" {
+		return nil, ErrInvalidUsername
+	}
+	user, err := svc.users.FindByName(username)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	return user, nil
+}
+
+func buildUserInfosFromUsers(users map[ID]*user) []UserInfo {
+	var infos = []UserInfo{}
+	for _, user := range users {
+		infos = append(infos, UserInfo{
+			ID:       user.ID,
+			Username: user.username,
+			Avatar:   avatar(user.email),
+			Bio:      user.bio,
+			Joined:   user.createdAt,
+		})
+	}
+	return infos
 }
 
 func (svc *service) updateUsername(username *string, user *user) error {
@@ -260,26 +419,8 @@ func updateBio(bio *string, user *user) error {
 	return nil
 }
 
-func (svc *service) UpdateLastSeen(id ID) error {
-	if !IsValidID(string(id)) {
-		return ErrNotFound
-	}
-
-	user, err := svc.users.FindByID(id)
-	if err != nil {
-		return ErrNotFound
-	}
-
-	user.lastSeen = time.Now().UTC()
-	err = svc.users.Store(user)
-	if err != nil {
-		return fmt.Errorf("error updating last seen: %s", err.Error())
-	}
-	return nil
-}
-
 func buildPostResponses(posts []*post, user *user) []postResponse {
-	var res []postResponse
+	var res = []postResponse{}
 
 	for _, p := range posts {
 		pr := postResponse{
@@ -302,8 +443,4 @@ func buildPostResponses(posts []*post, user *user) []postResponse {
 func avatar(email string) string {
 	digest := fmt.Sprintf("%x", md5.Sum([]byte(email)))
 	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?d=identicon", digest)
-}
-
-func NewService(users Repository, posts PostRepository) Service {
-	return &service{users: users, posts: posts}
 }

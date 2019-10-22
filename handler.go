@@ -97,10 +97,9 @@ func CreatePostHandler(svc Service) http.Handler {
 
 func GetProfileHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		params := httprouter.ParamsFromContext(r.Context())
-		username := strings.TrimSpace(params.ByName("username"))
-
 		w.Header().Set("Content-Type", "application/json")
+
+		username := getValueFromRequestParams(r, "username")
 		if username == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -121,8 +120,9 @@ func GetProfileHandler(svc Service) http.Handler {
 
 func EditProfileHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		request, err := decodeEditProfileRequest(r.Body)
 		w.Header().Set("Content-Type", "application/json")
+
+		request, err := decodeEditProfileRequest(r.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -142,44 +142,138 @@ func EditProfileHandler(svc Service) http.Handler {
 	})
 }
 
+func CreateRelationshipHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handleRelationship(w, r, svc.CreateRelationshipFor)
+	})
+}
+
+func RemoveRelationshipHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handleRelationship(w, r, svc.RemoveRelationshipFor)
+	})
+}
+
+type hFunc func(ID, string) error
+
+func handleRelationship(w http.ResponseWriter, r *http.Request, f hFunc) {
+	username, id, ok := getRelationshipRequestParams(r, w)
+	if !ok {
+		return
+	}
+
+	if err := f(ID(id), username); err != nil {
+		encodeError(err, w)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	return
+}
+
+func GetUserFriendsHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		getRelationships(w, r, svc.GetUserFriends)
+	})
+}
+
+func GetUserFollowersHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		getRelationships(w, r, svc.GetUserFollowers)
+	})
+}
+
+type gFunc func(string) ([]UserInfo, error)
+
+func getRelationships(w http.ResponseWriter, r *http.Request, f gFunc) {
+	w.Header().Set("Content-Type", "application/json")
+
+	username := getValueFromRequestParams(r, "username")
+	if username == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	friends, err := f(username)
+	if err != nil {
+		encodeError(err, w)
+		return
+	}
+
+	if err = json.NewEncoder(w).Encode(friends); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
 func LastSeenMiddleware(f http.Handler, svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id, ok := getUserIDFromContext(r.Context())
-		if !ok {
-			encodeError(ErrEmptyContext, w)
+		if id, ok := getUserIDFromContext(r.Context()); ok {
+			_ = svc.UpdateLastSeen(ID(id))
+			f.ServeHTTP(w, r)
 			return
 		}
 
-		err := svc.UpdateLastSeen(ID(id))
-		if err != nil {
-			encodeError(err, w)
-			return
+		tokenStr := getTokenStrFromRequest(r)
+		if token, err := parseTokenStr(tokenStr); err == nil {
+			if id, ok := token.Claims.(jwt.MapClaims)["sub"].(string); ok {
+				_ = svc.UpdateLastSeen(ID(id))
+			}
 		}
+
 		f.ServeHTTP(w, r)
 	})
 }
 
 func RequireAuth(f http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		tokenStr := getTokenFromRequest(r)
+		tokenStr := getTokenStrFromRequest(r)
 
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("error verifying signing method")
-			}
-			return []byte("e624d92e3fa438b6a8fac4f698e977cd"), nil
-		})
-
+		token, err := parseTokenStr(tokenStr)
 		if err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		claims := token.Claims.(jwt.MapClaims)
-		ctx := context.WithValue(r.Context(), idKey, claims["sub"])
+		ctx := addClaimsToCtx(r.Context(), token)
 
 		f.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func getRelationshipRequestParams(r *http.Request, w http.ResponseWriter) (string, string, bool) {
+	username := getValueFromRequestParams(r, "username")
+	if username == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return "", "", false
+	}
+
+	id, ok := getUserIDFromContext(r.Context())
+	if !ok {
+		encodeError(ErrEmptyContext, w)
+		return "", "", false
+	}
+
+	return username, id, true
+}
+
+func addClaimsToCtx(ctx context.Context, token *jwt.Token) context.Context {
+	claims := token.Claims.(jwt.MapClaims)
+	return context.WithValue(ctx, idKey, claims["sub"])
+}
+
+func parseTokenStr(tokenStr string) (*jwt.Token, error) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, errors.New("error verifying signing method")
+		}
+		return []byte("e624d92e3fa438b6a8fac4f698e977cd"), nil
+	})
+	return token, err
+}
+
+func getValueFromRequestParams(r *http.Request, name string) string {
+	params := httprouter.ParamsFromContext(r.Context())
+	return strings.TrimSpace(params.ByName(name))
 }
 
 func getUserIDFromContext(ctx context.Context) (id string, ok bool) {
@@ -187,7 +281,7 @@ func getUserIDFromContext(ctx context.Context) (id string, ok bool) {
 	return
 }
 
-func getTokenFromRequest(r *http.Request) string {
+func getTokenStrFromRequest(r *http.Request) string {
 	authHeader := strings.TrimSpace(r.Header.Get("Authorization"))
 	parts := strings.Split(authHeader, " ")
 	if len(parts) != 2 || strings.ToUpper(parts[0]) != "BEARER" {
@@ -204,14 +298,16 @@ func getJWTToken(id string) (string, error) {
 
 func encodeError(err error, w http.ResponseWriter) {
 	switch err {
-	case ErrExistingUsername, ErrExistingEmail:
+	case ErrInvalidCredentials, ErrInvalidID:
+		w.WriteHeader(http.StatusUnauthorized)
+	case ErrCantFollowSelf, ErrCantUnFollowSelf:
+		w.WriteHeader(http.StatusForbidden)
+	case ErrNotFound:
+		w.WriteHeader(http.StatusNotFound)
+	case ErrExistingUsername, ErrExistingEmail, ErrAlreadyFollowing, ErrNotFollowing:
 		w.WriteHeader(http.StatusConflict)
 	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername, ErrBioTooLong:
 		w.WriteHeader(http.StatusUnprocessableEntity)
-	case ErrInvalidCredentials, ErrInvalidID:
-		w.WriteHeader(http.StatusUnauthorized)
-	case ErrNotFound:
-		w.WriteHeader(http.StatusNotFound)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
