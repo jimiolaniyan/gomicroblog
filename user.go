@@ -15,6 +15,7 @@ type Repository interface {
 	FindByEmail(e string) (*user, error)
 	FindByID(id ID) (*user, error)
 	Delete(id ID) error
+	Update(u *user) error
 }
 
 type ID string

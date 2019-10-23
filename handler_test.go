@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -83,9 +82,7 @@ func (hs *HandlerTestSuite) SetupSuite() {
 		require.NoError(hs.T(), err)
 
 		err = client.Ping(ctx, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
+		require.NoError(hs.T(), err)
 
 		hs.client = client
 

@@ -13,7 +13,7 @@ type mongoUserRepository struct {
 	collection *mongo.Collection
 }
 
-type dBUser struct {
+type dbUser struct {
 	ID        ID `bson:"_id"`
 	Username  string
 	Password  string
@@ -30,33 +30,19 @@ func NewMongoUserRepository(c *mongo.Collection) Repository {
 }
 
 func (m *mongoUserRepository) FindByName(username string) (*user, error) {
-	return m.finUserByKV("username", username)
+	return m.findUserBy("username", username)
 }
 
 func (m *mongoUserRepository) FindByEmail(email string) (*user, error) {
-	return m.finUserByKV("email", email)
-}
-
-func (m *mongoUserRepository) Store(u *user) error {
-	dbu := dBUser{u.ID, u.username, u.password, u.email, u.createdAt, u.lastSeen, u.bio, u.Friends, u.Followers}
-	_, err := m.collection.InsertOne(context.TODO(), &dbu)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return m.findUserBy("email", email)
 }
 
 func (m *mongoUserRepository) FindByID(id ID) (*user, error) {
-	panic("implement me")
+	return m.findUserBy("_id", string(id))
 }
 
-func (m *mongoUserRepository) Delete(id ID) error {
-	panic("implement me")
-}
-
-func (m *mongoUserRepository) finUserByKV(key string, val string) (*user, error) {
-	var u dBUser
+func (m *mongoUserRepository) findUserBy(key string, val string) (*user, error) {
+	var u dbUser
 	sr := m.collection.FindOne(context.TODO(), bson.M{key: val})
 
 	if sr.Err() == mongo.ErrNoDocuments {
@@ -67,6 +53,31 @@ func (m *mongoUserRepository) finUserByKV(key string, val string) (*user, error)
 		return nil, err
 	}
 
-	nU := user{u.ID, u.Username, u.Password, u.Email, u.CreatedAt, u.LastSeen, u.Bio, u.Friends, u.Followers}
+	nU := userFromDBUser(u)
 	return &nU, nil
+}
+
+func (m *mongoUserRepository) Update(u *user) error {
+	dbu := dbUserFromUser(u)
+	_, err := m.collection.ReplaceOne(context.TODO(), bson.M{"_id": dbu.ID}, dbu)
+	return err
+}
+
+func (m *mongoUserRepository) Store(u *user) error {
+	dbu := dbUserFromUser(u)
+	_, err := m.collection.InsertOne(context.TODO(), &dbu)
+	return err
+}
+
+func (m *mongoUserRepository) Delete(id ID) error {
+	panic("implement me")
+}
+
+func dbUserFromUser(u *user) dbUser {
+	return dbUser{u.ID, u.username, u.password, u.email, u.createdAt, u.lastSeen, u.bio, u.Friends, u.Followers}
+}
+
+func userFromDBUser(u dbUser) user {
+	nU := user{u.ID, u.Username, u.Password, u.Email, u.CreatedAt, u.LastSeen, u.Bio, u.Friends, u.Followers}
+	return nU
 }

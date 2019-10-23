@@ -8,6 +8,12 @@ type userRepository struct {
 	users map[ID]*user
 }
 
+func (repo *userRepository) Update(u *user) error {
+	// We don't need to do anything for in-memory implementations
+	// since updating is taken care of when using pointers
+	return nil
+}
+
 func NewUserRepository() Repository {
 	return &userRepository{users: map[ID]*user{}}
 }

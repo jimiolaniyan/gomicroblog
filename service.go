@@ -257,7 +257,10 @@ func (svc *service) EditProfile(id ID, req editProfileRequest) error {
 			return err
 		}
 	}
-	// TODO May need to call svc.users.Store with a real DB
+
+	if err := svc.users.Update(user); err != nil {
+		return err
+	}
 
 	return nil
 }
