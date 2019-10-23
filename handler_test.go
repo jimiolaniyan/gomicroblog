@@ -1,6 +1,7 @@
 package gomicroblog
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -8,11 +9,18 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/julienschmidt/httprouter"
 
@@ -23,13 +31,72 @@ import (
 
 type HandlerTestSuite struct {
 	suite.Suite
-	userID ID
-	svc    Service
-	req    registerUserRequest
+	userID      ID
+	svc         Service
+	req         registerUserRequest
+	containerID string
+	client      *mongo.Client
+}
+
+func (hs *HandlerTestSuite) TearDownSuite() {
+	if !testing.Short() {
+		_ = hs.client.Disconnect(context.Background())
+
+		// kill docker container
+		_ = exec.Command("docker", "kill", hs.containerID).Run()
+	}
 }
 
 func (hs *HandlerTestSuite) SetupSuite() {
-	hs.svc = NewService(NewUserRepository(), NewPostRepository())
+	var users Repository
+	//var posts PostRepository
+
+	if !testing.Short() {
+		//out, _ := exec.Command("docker", "images", "--no-trunc").Output()
+		//fmt.Println(bytes.Contains(out, []byte("mongo")))
+
+		rOut, err := exec.Command("docker", "container", "run", "--detach", "--rm", "mongo:latest").Output()
+		require.NoError(hs.T(), err)
+
+		containerID := strings.TrimSpace(string(rOut))
+		hs.containerID = containerID
+
+		fmt.Println("Container id:", containerID)
+
+		iOut, err := exec.Command("docker", "inspect", containerID).Output()
+
+		var con []struct {
+			NetworkSettings struct {
+				IPAddress string
+			}
+		}
+
+		_ = json.NewDecoder(bytes.NewReader(iOut)).Decode(&con)
+
+		ip := con[0].NetworkSettings.IPAddress
+		fmt.Println("Container ip:", ip)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+ip+":27017"))
+		require.NoError(hs.T(), err)
+
+		err = client.Ping(ctx, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		hs.client = client
+
+		c := client.Database("testing").Collection("users")
+		users = NewMongoUserRepository(c)
+	} else {
+		users = NewUserRepository()
+		//posts = NewPostRepository()
+	}
+
+	hs.svc = NewService(users, NewPostRepository())
 	hs.req = registerUserRequest{"user", "password", "a@b.com"}
 	id, _ := hs.svc.RegisterNewUser(hs.req)
 	hs.userID = id
@@ -65,12 +132,10 @@ func TestDecodeRequest(t *testing.T) {
 var nilErr = errors.New("")
 
 func (hs *HandlerTestSuite) TestRegisterNewUserHandler() {
-	svc := &service{users: NewUserRepository()}
-
-	registerReq := `{"username":"jimi", "password":"password1", "email":"test@tester.test"}`
-	invalidPassReq := `{"username": "username", "password": "pass", "email": "a@b.com"}`
 	invalidUsernameReq := `{"username": "", "password": "pass"}`
+	invalidPassReq := `{"username": "username", "password": "pass", "email": "a@b.com"}`
 	invalidEmailReq := `{"username": "username", "password": "password", "email": "ab.com"}`
+	registerReq := `{"username":"jimi", "password":"password1", "email":"test@tester.test"}`
 	existingUserReq := `{"username": "jimi", "password": "password", "email": "a@b.com"}`
 	existingEmailReq := `{"username": "username", "password": "password", "email": "test@tester.test"}`
 
@@ -95,7 +160,7 @@ func (hs *HandlerTestSuite) TestRegisterNewUserHandler() {
 
 		w := httptest.NewRecorder()
 		handler := http.NewServeMux()
-		handler.Handle("/v1/users", RegisterUserHandler(svc))
+		handler.Handle("/v1/users", RegisterUserHandler(hs.svc))
 		handler.ServeHTTP(w, r)
 
 		var res struct {
