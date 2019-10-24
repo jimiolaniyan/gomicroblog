@@ -321,21 +321,30 @@ func (svc *service) RemoveRelationshipFor(id ID, username string) error {
 }
 
 func (svc *service) GetUserFriends(username string) ([]UserInfo, error) {
-	user, err := svc.findUser(username)
+	if username == "" {
+		return nil, ErrInvalidUsername
+	}
+
+	friends, err := svc.users.FindFriends(username)
 	if err != nil {
 		return nil, err
 	}
 
-	return buildUserInfosFromUsers(user.Friends), nil
+	return buildUserInfosFromUsers(friends), nil
+
 }
 
 func (svc *service) GetUserFollowers(username string) ([]UserInfo, error) {
-	user, err := svc.findUser(username)
+	if username == "" {
+		return nil, ErrInvalidUsername
+	}
+
+	friends, err := svc.users.FindFollowers(username)
 	if err != nil {
 		return nil, err
 	}
 
-	return buildUserInfosFromUsers(user.Followers), nil
+	return buildUserInfosFromUsers(friends), nil
 }
 
 func (svc *service) GetTimeline(id ID) ([]postResponse, error) {
@@ -387,7 +396,7 @@ func (svc *service) findUser(username string) (*user, error) {
 	return user, nil
 }
 
-func buildUserInfosFromUsers(users map[ID]*user) []UserInfo {
+func buildUserInfosFromUsers(users []user) []UserInfo {
 	var infos = []UserInfo{}
 	for _, user := range users {
 		infos = append(infos, UserInfo{

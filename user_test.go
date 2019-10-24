@@ -16,7 +16,7 @@ func TestHashPassword_ReturnsCorrectHash(t *testing.T) {
 }
 
 func TestNewUser(t *testing.T) {
-	u := &user{username: "user", email: "e@m.co", Friends: map[ID]*user{}, Followers: map[ID]*user{}}
+	u := &user{username: "user", email: "e@m.co"}
 
 	tests := []struct {
 		username, email string

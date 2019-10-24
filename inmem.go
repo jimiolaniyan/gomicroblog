@@ -56,6 +56,35 @@ func (repo *userRepository) Delete(id ID) error {
 	return nil
 }
 
+func (repo *userRepository) FindFriends(username string) ([]user, error) {
+	user, err := repo.FindByName(username)
+	if err != nil {
+		return nil, err
+	}
+
+	return repo.FindByIDs(user.Friends), nil
+}
+
+func (repo *userRepository) FindFollowers(username string) ([]user, error) {
+	user, err := repo.FindByName(username)
+	if err != nil {
+		return nil, err
+	}
+
+	return repo.FindByIDs(user.Followers), nil
+}
+
+func (repo *userRepository) FindByIDs(ids []ID) []user {
+	users := []user{}
+	for _, id := range ids {
+		if u, _ := repo.FindByID(id); u != nil {
+			users = append(users, *u)
+		}
+
+	}
+	return users
+}
+
 type postRepository struct {
 	posts map[PostID]post
 }
@@ -85,10 +114,11 @@ func (repo *postRepository) FindLatestPostsForUser(id ID) ([]*post, error) {
 }
 
 func (repo *postRepository) FindLatestPostsForUserAndFriends(user *user) ([]*post, error) {
-	posts := repo.FindUserPosts(user.ID)
+	id := user.ID
+	posts := repo.FindUserPosts(id)
 
-	for _, user := range user.Friends {
-		ps := repo.FindUserPosts(user.ID)
+	for _, id := range user.Friends {
+		ps := repo.FindUserPosts(id)
 		posts = append(posts, ps...)
 	}
 

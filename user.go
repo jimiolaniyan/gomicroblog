@@ -16,6 +16,8 @@ type Repository interface {
 	FindByID(id ID) (*user, error)
 	Delete(id ID) error
 	Update(u *user) error
+	FindFriends(username string) ([]user, error)
+	FindFollowers(username string) ([]user, error)
 }
 
 type ID string
@@ -31,8 +33,8 @@ type user struct {
 	createdAt time.Time
 	lastSeen  time.Time
 	bio       string
-	Friends   map[ID]*user
-	Followers map[ID]*user
+	Friends   []ID
+	Followers []ID
 }
 
 var (
@@ -52,21 +54,36 @@ var (
 )
 
 func (u1 *user) IsFollowing(u2 *user) bool {
-	if _, ok := u1.Friends[u2.ID]; ok {
-		return true
+	for _, id := range u1.Friends {
+		if id == u2.ID {
+			return true
+		}
 	}
 
 	return false
 }
 
 func (u1 *user) Follow(u2 *user) {
-	u1.Friends[u2.ID] = u2
-	u2.Followers[u1.ID] = u1
+	u1.Friends = append(u1.Friends, u2.ID)
+	u2.Followers = append(u2.Followers, u1.ID)
 }
 
 func (u1 *user) Unfollow(u2 *user) {
-	delete(u1.Friends, u2.ID)
-	delete(u2.Followers, u1.ID)
+	// remove u2 from u1 friends
+	for i, id := range u1.Friends {
+		if id == u2.ID {
+			u1.Friends = append(u1.Friends[:i], u1.Friends[i+1:]...)
+			break
+		}
+	}
+
+	// remove u1 from u2 followers
+	for i, id := range u2.Followers {
+		if id == u1.ID {
+			u2.Followers = append(u2.Followers[:i], u2.Followers[i+1:]...)
+			break
+		}
+	}
 }
 
 func NewUser(username, email string) (*user, error) {
@@ -74,7 +91,7 @@ func NewUser(username, email string) (*user, error) {
 		return nil, err
 	}
 
-	return &user{username: username, email: email, Friends: map[ID]*user{}, Followers: map[ID]*user{}}, nil
+	return &user{username: username, email: email}, nil
 }
 
 func validateArgs(username string, email string) error {

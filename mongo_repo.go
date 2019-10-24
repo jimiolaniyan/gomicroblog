@@ -21,7 +21,7 @@ type dbUser struct {
 	CreatedAt time.Time
 	LastSeen  time.Time
 	Bio       string
-	Friends   map[ID]*user
+	Friends   []ID
 	Followers map[ID]*user
 }
 
@@ -82,11 +82,28 @@ func (m *mongoUserRepository) Delete(id ID) error {
 	panic("implement me")
 }
 
+func (m *mongoUserRepository) FindFriends(username string) ([]user, error) {
+	panic("implement me")
+}
+
+func (m *mongoUserRepository) FindFollowers(username string) ([]user, error) {
+	panic("implement me")
+}
+
 func dbUserFromUser(u *user) dbUser {
-	return dbUser{u.ID, u.username, u.password, u.email, u.createdAt, u.lastSeen, u.bio, u.Friends, u.Followers}
+	var ids []ID
+	for _, id := range u.Friends {
+		ids = append(ids, id)
+	}
+	//return dbUser{u.ID, u.username, u.password, u.email, u.createdAt, u.lastSeen, u.bio, ids, u.Followers}
+	return dbUser{}
 }
 
 func userFromDBUser(u dbUser) user {
-	nU := user{u.ID, u.Username, u.Password, u.Email, u.CreatedAt, u.LastSeen, u.Bio, u.Friends, u.Followers}
-	return nU
+	friends := map[ID]*user{}
+	for _, id := range u.Friends {
+		friends[id] = &user{}
+	}
+	//nU := user{u.ID, u.Username, u.Password, u.Email, u.CreatedAt, u.LastSeen, u.Bio, friends, u.Followers}
+	return user{}
 }
