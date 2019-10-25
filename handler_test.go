@@ -262,9 +262,13 @@ func (hs *HandlerTestSuite) TestCreatePostHandler() {
 }
 
 func (hs *HandlerTestSuite) TestGetProfileHandler() {
-	u := hs.req.Username
+	u := "postu"
 	host := "http://localhost:8080"
 	finalURL := fmt.Sprintf("%s/v1/users/%s", host, u)
+
+	id, _ := hs.svc.RegisterNewUser(registerUserRequest{"postu", "password", "e@mma.com"})
+	_, _ = hs.svc.CreatePost(hs.userID, "post")
+	_, _ = hs.svc.CreatePost(id, "post")
 
 	tests := []struct {
 		username              string
@@ -272,10 +276,11 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 		wantErr               error
 		wantID                bool
 		wantUsername, wantURL string
+		wantPosLen            int
 	}{
 		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr, wantUsername: ""},
 		{username: "nonexistent", wantCode: http.StatusNotFound, wantErr: ErrNotFound, wantUsername: ""},
-		{username: u, wantCode: http.StatusOK, wantErr: nilErr, wantID: true, wantUsername: u, wantURL: finalURL},
+		{username: u, wantCode: http.StatusOK, wantErr: nilErr, wantID: true, wantUsername: u, wantURL: finalURL, wantPosLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -300,6 +305,7 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
 		assert.Equal(hs.T(), tt.wantID, IsValidID(string(res.Profile.ID)))
 		assert.Equal(hs.T(), tt.wantUsername, res.Profile.Username)
+		assert.Equal(hs.T(), tt.wantPosLen, len(res.Profile.Posts))
 		assert.Equal(hs.T(), tt.wantURL, res.URL)
 	}
 

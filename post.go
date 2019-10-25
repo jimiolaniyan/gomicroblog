@@ -20,9 +20,7 @@ type PostRepository interface {
 type PostID string
 
 type Author struct {
-	UserID   ID
-	Username string
-	Avatar   string
+	UserID ID `bson:"user_id"`
 }
 
 type post struct {

@@ -2,6 +2,7 @@ package gomicroblog
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -121,8 +122,12 @@ type mongoPostRepository struct {
 	collection *mongo.Collection
 }
 
+func NewMongoPostRepository(c *mongo.Collection) PostRepository {
+	return &mongoPostRepository{collection: c}
+}
+
 func (m *mongoPostRepository) FindByID(id PostID) (post, error) {
-	panic("implement me")
+	return post{}, errors.New("implement me")
 }
 
 func (m *mongoPostRepository) Store(post post) error {
@@ -131,13 +136,28 @@ func (m *mongoPostRepository) Store(post post) error {
 }
 
 func (m *mongoPostRepository) FindLatestPostsForUser(id ID) ([]*post, error) {
-	panic("implement me")
+	filter := bson.D{
+		{"author.user_id", id},
+	}
+
+	cursor, err := m.collection.Find(context.TODO(), filter)
+	if err != nil {
+		return nil, err
+	}
+
+	posts := []*post{}
+	for cursor.Next(context.TODO()) {
+		var p post
+		err := cursor.Decode(&p)
+		if err != nil {
+			return nil, err
+		}
+		posts = append(posts, &p)
+	}
+
+	return posts, nil
 }
 
 func (m *mongoPostRepository) FindLatestPostsForUserAndFriends(user *user) ([]*post, error) {
-	panic("implement me")
-}
-
-func NewMongoPostRepository(c *mongo.Collection) PostRepository {
-	return &mongoPostRepository{collection: c}
+	return nil, errors.New("implement me")
 }
