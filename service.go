@@ -276,7 +276,7 @@ func (svc *service) UpdateLastSeen(id ID) error {
 	}
 
 	user.lastSeen = time.Now().UTC()
-	err = svc.users.Store(user)
+	err = svc.users.Update(user)
 	if err != nil {
 		return fmt.Errorf("error updating last seen: %s", err.Error())
 	}
@@ -338,30 +338,31 @@ func (svc *service) RemoveRelationshipFor(id ID, username string) error {
 }
 
 func (svc *service) GetUserFriends(username string) ([]UserInfo, error) {
-	if username == "" {
-		return nil, ErrInvalidUsername
+	user, err := svc.findUser(username)
+	if err != nil {
+		return nil, err
 	}
 
-	friends, err := svc.users.FindFriends(username)
+	friends, err := svc.users.FindByIDs(user.Friends)
 	if err != nil {
 		return nil, err
 	}
 
 	return buildUserInfosFromUsers(friends), nil
-
 }
 
 func (svc *service) GetUserFollowers(username string) ([]UserInfo, error) {
-	if username == "" {
-		return nil, ErrInvalidUsername
-	}
-
-	friends, err := svc.users.FindFollowers(username)
+	user, err := svc.findUser(username)
 	if err != nil {
 		return nil, err
 	}
 
-	return buildUserInfosFromUsers(friends), nil
+	followers, err := svc.users.FindByIDs(user.Followers)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildUserInfosFromUsers(followers), nil
 }
 
 func (svc *service) GetTimeline(id ID) ([]postResponse, error) {

@@ -2,7 +2,6 @@ package gomicroblog
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -64,24 +63,18 @@ func (m *mongoUserRepository) Delete(id ID) error {
 	return nil
 }
 
-func (m *mongoUserRepository) FindFriends(username string) ([]user, error) {
+func (m *mongoUserRepository) FindByIDs(ids []ID) ([]user, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	friends := []user{}
-	b := bson.A{
-		bson.D{{"$match", bson.D{{"username", username}}}},
-		bson.D{{"$lookup", bson.D{
-			{"from", "users"},
-			{"localField", "friends"},
-			{"foreignField", "_id"},
-			{"as", "friends"},
-		}}},
-	}
 
-	cursor, err := m.collection.Aggregate(ctx, b)
+	filter := bson.D{{"_id", bson.D{
+		{"$in", ids},
+	}}}
+
+	cursor, err := m.collection.Find(ctx, filter)
 	if err != nil {
-		fmt.Println("line, 84", err)
 		return friends, err
 	}
 
@@ -89,17 +82,12 @@ func (m *mongoUserRepository) FindFriends(username string) ([]user, error) {
 		var u dbUser
 		err := cursor.Decode(&u)
 		if err != nil {
-			fmt.Println("line 92:", err)
 			return friends, err
 		}
-		f := userFromDBUser(u)
-		friends = append(friends, f)
+
+		friends = append(friends, userFromDBUser(u))
 	}
 	return friends, nil
-}
-
-func (m *mongoUserRepository) FindFollowers(username string) ([]user, error) {
-	return []user{}, nil
 }
 
 func (m *mongoUserRepository) findUserBy(key string, val string) (*user, error) {

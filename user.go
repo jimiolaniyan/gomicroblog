@@ -16,8 +16,7 @@ type Repository interface {
 	FindByID(id ID) (*user, error)
 	Delete(id ID) error
 	Update(u *user) error
-	FindFriends(username string) ([]user, error)
-	FindFollowers(username string) ([]user, error)
+	FindByIDs(ids []ID) ([]user, error)
 }
 
 type ID string

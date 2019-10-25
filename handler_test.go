@@ -37,15 +37,6 @@ type HandlerTestSuite struct {
 	client      *mongo.Client
 }
 
-func (hs *HandlerTestSuite) TearDownSuite() {
-	if !testing.Short() {
-		_ = hs.client.Disconnect(context.Background())
-
-		// kill docker container
-		_ = exec.Command("docker", "kill", hs.containerID).Run()
-	}
-}
-
 func (hs *HandlerTestSuite) SetupSuite() {
 	var users Repository
 	//var posts PostRepository
@@ -99,7 +90,18 @@ func (hs *HandlerTestSuite) SetupSuite() {
 	hs.userID = id
 }
 
-func TestDecodeRequest(t *testing.T) {
+func (hs *HandlerTestSuite) TearDownSuite() {
+	if !testing.Short() {
+		_ = hs.client.Disconnect(context.Background())
+
+		// kill docker container
+		_ = exec.Command("docker", "kill", hs.containerID).Run()
+	}
+}
+
+var nilErr = errors.New("")
+
+func (hs *HandlerTestSuite) TestDecodeRequest() {
 	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
 	loginReq := `{"username": "jimi", "password": "password1"}`
 	createPostReq := `{"body": "a simple post"}`
@@ -121,12 +123,10 @@ func TestDecodeRequest(t *testing.T) {
 	for _, tt := range tests {
 		body := ioutil.NopCloser(strings.NewReader(tt.r))
 		req, err := tt.decoder(body)
-		assert.Equal(t, tt.wantErr, err)
-		assert.Equal(t, tt.wantReq, req)
+		assert.Equal(hs.T(), tt.wantErr, err)
+		assert.Equal(hs.T(), tt.wantReq, req)
 	}
 }
-
-var nilErr = errors.New("")
 
 func (hs *HandlerTestSuite) TestRegisterNewUserHandler() {
 	invalidUsernameReq := `{"username": "", "password": "pass"}`
@@ -536,7 +536,7 @@ func (hs *HandlerTestSuite) TestGetRelationships() {
 
 var invalidToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"
 
-func TestRequireAuthMiddleware(t *testing.T) {
+func (hs *HandlerTestSuite) TestRequireAuthMiddleware() {
 	validToken, _ := getJWTToken("randomid")
 
 	tests := []struct {
@@ -560,7 +560,6 @@ func TestRequireAuthMiddleware(t *testing.T) {
 	})
 
 	for _, tt := range tests {
-
 		h := RequireAuth(f)
 		r, _ := http.NewRequest(http.MethodPost, "/v1/posts", nil)
 		r.Header.Set("Authorization", tt.authHeader)
@@ -571,9 +570,9 @@ func TestRequireAuthMiddleware(t *testing.T) {
 
 		mux.ServeHTTP(w, r)
 
-		assert.IsType(t, new(http.Handler), &h)
-		assert.Equal(t, tt.wantID, id)
-		assert.Equal(t, tt.wantCode, w.Code)
+		assert.IsType(hs.T(), new(http.Handler), &h)
+		assert.Equal(hs.T(), tt.wantID, id)
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
 	}
 }
 

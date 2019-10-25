@@ -8,12 +8,6 @@ type userRepository struct {
 	users map[ID]*user
 }
 
-func (repo *userRepository) Update(u *user) error {
-	// We don't need to do anything for in-memory implementations
-	// since updating is taken care of when using pointers
-	return nil
-}
-
 func NewUserRepository() Repository {
 	return &userRepository{users: map[ID]*user{}}
 }
@@ -48,6 +42,12 @@ func (repo *userRepository) FindByName(username string) (*user, error) {
 	return nil, ErrNotFound
 }
 
+func (repo *userRepository) Update(u *user) error {
+	// We don't need to do anything for in-memory implementations
+	// since updating is taken care of when using pointers
+	return nil
+}
+
 func (repo *userRepository) Delete(id ID) error {
 	if _, ok := repo.users[id]; !ok {
 		return ErrNotFound
@@ -56,25 +56,7 @@ func (repo *userRepository) Delete(id ID) error {
 	return nil
 }
 
-func (repo *userRepository) FindFriends(username string) ([]user, error) {
-	user, err := repo.FindByName(username)
-	if err != nil {
-		return nil, err
-	}
-
-	return repo.FindByIDs(user.Friends), nil
-}
-
-func (repo *userRepository) FindFollowers(username string) ([]user, error) {
-	user, err := repo.FindByName(username)
-	if err != nil {
-		return nil, err
-	}
-
-	return repo.FindByIDs(user.Followers), nil
-}
-
-func (repo *userRepository) FindByIDs(ids []ID) []user {
+func (repo *userRepository) FindByIDs(ids []ID) ([]user, error) {
 	users := []user{}
 	for _, id := range ids {
 		if u, _ := repo.FindByID(id); u != nil {
@@ -82,7 +64,7 @@ func (repo *userRepository) FindByIDs(ids []ID) []user {
 		}
 
 	}
-	return users
+	return users, nil
 }
 
 type postRepository struct {
