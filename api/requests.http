@@ -1,3 +1,4 @@
+# Register user
 POST http://{{host}}:{{port}}/v1/users
 Content-Type: application/json
 
@@ -9,6 +10,7 @@ Content-Type: application/json
 
 ###
 
+# Register user
 POST http://{{host}}:{{port}}/v1/users
 Content-Type: application/json
 
@@ -20,6 +22,7 @@ Content-Type: application/json
 
 ###
 
+# Login
 POST http://{{host}}:{{port}}/v1/sessions
 Content-Type: application/json
 
@@ -29,6 +32,7 @@ Content-Type: application/json
 }
 ###
 
+# Create a post
 POST http://{{host}}:{{port}}/v1/posts
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -39,12 +43,14 @@ Content-Type: application/json
 
 ###
 
+# Get user profile
 GET http://{{host}}:{{port}}/v1/users/user
 Authorization: Bearer {{token}}
 Accept: application/json
 
 ###
 
+# Edit profile
 PATCH http://{{host}}:{{port}}/v1/users
 Authorization: Bearer {{token}}
 Content-Type: application/json
@@ -56,24 +62,28 @@ Content-Type: application/json
 
 ###
 
+# Follow user
 POST http://{{host}}:{{port}}/v1/users/user2/followers
 Authorization: Bearer {{token}}
 Accept: application/json
 
 ###
 
+# Unfollow user
 DELETE http://{{host}}:{{port}}/v1/users/user2/followers
 Authorization: Bearer {{token}}
 Accept: application/json
 
 ###
 
+# Get user's friends (following)
 GET http://{{host}}:{{port}}/v1/users/user/friends
 Authorization: Bearer {{token}}
 Accept: application/json
 
 ###
 
+# Get user's followers (following)
 GET http://{{host}}:{{port}}/v1/users/user/followers
 Authorization: Bearer {{token}}
 Accept: application/json
