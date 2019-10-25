@@ -2,6 +2,7 @@ package gomicroblog
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -22,7 +23,7 @@ type dbUser struct {
 	LastSeen  time.Time
 	Bio       string
 	Friends   []ID
-	Followers map[ID]*user
+	Followers []ID
 }
 
 func NewMongoUserRepository(c *mongo.Collection) Repository {
@@ -39,25 +40,6 @@ func (m *mongoUserRepository) FindByEmail(email string) (*user, error) {
 
 func (m *mongoUserRepository) FindByID(id ID) (*user, error) {
 	return m.findUserBy("_id", string(id))
-}
-
-func (m *mongoUserRepository) findUserBy(key string, val string) (*user, error) {
-	var u dbUser
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	sr := m.collection.FindOne(ctx, bson.M{key: val})
-
-	if sr.Err() == mongo.ErrNoDocuments {
-		return nil, ErrNotFound
-	}
-
-	if err := sr.Decode(&u); err != nil {
-		return nil, err
-	}
-
-	nU := userFromDBUser(u)
-	return &nU, nil
 }
 
 func (m *mongoUserRepository) Update(u *user) error {
@@ -79,31 +61,70 @@ func (m *mongoUserRepository) Store(u *user) error {
 }
 
 func (m *mongoUserRepository) Delete(id ID) error {
-	panic("implement me")
+	return nil
 }
 
 func (m *mongoUserRepository) FindFriends(username string) ([]user, error) {
-	panic("implement me")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	friends := []user{}
+	b := bson.A{
+		bson.D{{"$match", bson.D{{"username", username}}}},
+		bson.D{{"$lookup", bson.D{
+			{"from", "users"},
+			{"localField", "friends"},
+			{"foreignField", "_id"},
+			{"as", "friends"},
+		}}},
+	}
+
+	cursor, err := m.collection.Aggregate(ctx, b)
+	if err != nil {
+		fmt.Println("line, 84", err)
+		return friends, err
+	}
+
+	for cursor.Next(ctx) {
+		var u dbUser
+		err := cursor.Decode(&u)
+		if err != nil {
+			fmt.Println("line 92:", err)
+			return friends, err
+		}
+		f := userFromDBUser(u)
+		friends = append(friends, f)
+	}
+	return friends, nil
 }
 
 func (m *mongoUserRepository) FindFollowers(username string) ([]user, error) {
-	panic("implement me")
+	return []user{}, nil
+}
+
+func (m *mongoUserRepository) findUserBy(key string, val string) (*user, error) {
+	var u dbUser
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	sr := m.collection.FindOne(ctx, bson.M{key: val})
+
+	if sr.Err() == mongo.ErrNoDocuments {
+		return nil, ErrNotFound
+	}
+
+	if err := sr.Decode(&u); err != nil {
+		return nil, err
+	}
+
+	nU := userFromDBUser(u)
+	return &nU, nil
 }
 
 func dbUserFromUser(u *user) dbUser {
-	var ids []ID
-	for _, id := range u.Friends {
-		ids = append(ids, id)
-	}
-	//return dbUser{u.ID, u.username, u.password, u.email, u.createdAt, u.lastSeen, u.bio, ids, u.Followers}
-	return dbUser{}
+	return dbUser{u.ID, u.username, u.password, u.email, u.createdAt, u.lastSeen, u.bio, u.Friends, u.Followers}
 }
 
 func userFromDBUser(u dbUser) user {
-	friends := map[ID]*user{}
-	for _, id := range u.Friends {
-		friends[id] = &user{}
-	}
-	//nU := user{u.ID, u.Username, u.Password, u.Email, u.CreatedAt, u.LastSeen, u.Bio, friends, u.Followers}
-	return user{}
+	return user{u.ID, u.Username, u.Password, u.Email, u.CreatedAt, u.LastSeen, u.Bio, u.Friends, u.Followers}
 }

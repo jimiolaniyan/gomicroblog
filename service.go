@@ -298,7 +298,15 @@ func (svc *service) CreateRelationshipFor(id ID, username string) error {
 	}
 
 	u1.Follow(u2)
-	// TODO May need to call svc.users.Store with a real DB
+
+	if err = svc.users.Update(u1); err != nil {
+		return err
+	}
+
+	if err = svc.users.Update(u2); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -317,6 +325,15 @@ func (svc *service) RemoveRelationshipFor(id ID, username string) error {
 	}
 
 	u1.Unfollow(u2)
+
+	if err = svc.users.Update(u1); err != nil {
+		return err
+	}
+
+	if err = svc.users.Update(u2); err != nil {
+		return err
+	}
+
 	return nil
 }
 
