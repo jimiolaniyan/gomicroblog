@@ -1,7 +1,6 @@
 package gomicroblog
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -43,25 +42,14 @@ func (hs *HandlerTestSuite) SetupSuite() {
 	var posts PostRepository
 
 	if !testing.Short() {
-		rOut, err := exec.Command("docker", "container", "run", "--detach", "--rm", "mongo:latest").Output()
+		containerID, err := RunDockerContainer("mongo:latest")
 		require.NoError(hs.T(), err)
 
-		containerID := strings.TrimSpace(string(rOut))
 		hs.containerID = containerID
 
 		log.Println("Container id:", containerID)
 
-		iOut, err := exec.Command("docker", "inspect", containerID).Output()
-
-		var con []struct {
-			NetworkSettings struct {
-				IPAddress string
-			}
-		}
-
-		_ = json.NewDecoder(bytes.NewReader(iOut)).Decode(&con)
-
-		ip := con[0].NetworkSettings.IPAddress
+		ip, _ := GetContainerIP(containerID)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
