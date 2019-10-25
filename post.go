@@ -26,10 +26,10 @@ type Author struct {
 }
 
 type post struct {
-	ID        PostID
+	ID        PostID `bson:"_id"`
 	Author    Author
-	body      string
-	timestamp time.Time
+	Body      string
+	Timestamp time.Time
 }
 
 // TODO check that author id and name are properly set
@@ -38,5 +38,5 @@ func NewPost(author Author, body string) (*post, error) {
 		return nil, ErrEmptyBody
 	}
 
-	return &post{Author: author, body: body, timestamp: time.Now()}, nil
+	return &post{Author: author, Body: body, Timestamp: time.Now()}, nil
 }

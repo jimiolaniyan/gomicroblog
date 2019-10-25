@@ -116,3 +116,28 @@ func dbUserFromUser(u *user) dbUser {
 func userFromDBUser(u dbUser) user {
 	return user{u.ID, u.Username, u.Password, u.Email, u.CreatedAt, u.LastSeen, u.Bio, u.Friends, u.Followers}
 }
+
+type mongoPostRepository struct {
+	collection *mongo.Collection
+}
+
+func (m *mongoPostRepository) FindByID(id PostID) (post, error) {
+	panic("implement me")
+}
+
+func (m *mongoPostRepository) Store(post post) error {
+	_, err := m.collection.InsertOne(context.TODO(), &post)
+	return err
+}
+
+func (m *mongoPostRepository) FindLatestPostsForUser(id ID) ([]*post, error) {
+	panic("implement me")
+}
+
+func (m *mongoPostRepository) FindLatestPostsForUserAndFriends(user *user) ([]*post, error) {
+	panic("implement me")
+}
+
+func NewMongoPostRepository(c *mongo.Collection) PostRepository {
+	return &mongoPostRepository{collection: c}
+}

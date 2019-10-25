@@ -455,8 +455,8 @@ func buildPostResponses(posts []*post, user *user) []postResponse {
 	for _, p := range posts {
 		pr := postResponse{
 			ID:        p.ID,
-			Body:      p.body,
-			Timestamp: p.timestamp,
+			Body:      p.Body,
+			Timestamp: p.Timestamp,
 			Author: authorResponse{
 				UserID:   user.ID,
 				Username: user.username,

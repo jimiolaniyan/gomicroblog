@@ -109,7 +109,8 @@ func nextID() ID {
 	return ID(xid.New().String())
 }
 
-//IsValidID checks if a given id is valid based on the xid library
+//IsValidID checks if a given id is valid based on the xid library definition of a valid id
+// this method should change if we ever change our uid generation library
 func IsValidID(id string) bool {
 	if _, err := xid.FromString(id); err == xid.ErrInvalidID {
 		return false

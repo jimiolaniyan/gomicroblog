@@ -9,10 +9,11 @@ application in Golang using TDD, BDD and Robert C. Martin's Clean Architecture.
 `cd gomicroblog`
  
 - Run the tests  
-`go test -v ./...`
+`go test ./... -v -short`  
+ Note: running without `-short` flag requires `docker` with `mongo:latest` image
 - Build the project  
 `go build -o blog api/main.go`
-- Run the app with  
+- Start the server  
 `./blog`
 
 ## API Requests 

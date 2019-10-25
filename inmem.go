@@ -121,6 +121,6 @@ func (repo *postRepository) FindUserPosts(id ID) []*post {
 
 func sortPostsByTimestamp(posts []*post) {
 	sort.Slice(posts, func(i, j int) bool {
-		return posts[i].timestamp.After(posts[j].timestamp)
+		return posts[i].Timestamp.After(posts[j].Timestamp)
 	})
 }

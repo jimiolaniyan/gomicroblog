@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -39,19 +40,16 @@ type HandlerTestSuite struct {
 
 func (hs *HandlerTestSuite) SetupSuite() {
 	var users Repository
-	//var posts PostRepository
+	var posts PostRepository
 
 	if !testing.Short() {
-		//out, _ := exec.Command("docker", "images", "--no-trunc").Output()
-		//fmt.Println(bytes.Contains(out, []byte("mongo")))
-
 		rOut, err := exec.Command("docker", "container", "run", "--detach", "--rm", "mongo:latest").Output()
 		require.NoError(hs.T(), err)
 
 		containerID := strings.TrimSpace(string(rOut))
 		hs.containerID = containerID
 
-		fmt.Println("Container id:", containerID)
+		log.Println("Container id:", containerID)
 
 		iOut, err := exec.Command("docker", "inspect", containerID).Output()
 
@@ -64,7 +62,6 @@ func (hs *HandlerTestSuite) SetupSuite() {
 		_ = json.NewDecoder(bytes.NewReader(iOut)).Decode(&con)
 
 		ip := con[0].NetworkSettings.IPAddress
-		fmt.Println("Container ip:", ip)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -77,14 +74,16 @@ func (hs *HandlerTestSuite) SetupSuite() {
 
 		hs.client = client
 
-		c := client.Database("testing").Collection("users")
-		users = NewMongoUserRepository(c)
+		u := client.Database("testing").Collection("users")
+		p := client.Database("testing").Collection("posts")
+		users = NewMongoUserRepository(u)
+		posts = NewMongoPostRepository(p)
 	} else {
 		users = NewUserRepository()
-		//posts = NewPostRepository()
+		posts = NewPostRepository()
 	}
 
-	hs.svc = NewService(users, NewPostRepository())
+	hs.svc = NewService(users, posts)
 	hs.req = registerUserRequest{"user", "password", "a@b.com"}
 	id, _ := hs.svc.RegisterNewUser(hs.req)
 	hs.userID = id

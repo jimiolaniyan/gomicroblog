@@ -92,14 +92,14 @@ func (bs *BddTestSuite) TestPostCreation() {
 				p := &post{}
 
 				for _, post := range posts {
-					if post.Author.UserID == bs.userID && post.body == body {
+					if post.Author.UserID == bs.userID && post.Body == body {
 						p = post
 					}
 				}
 
 				So(p, ShouldNotBeNil)
 				So(postId, ShouldEqual, p.ID)
-				So(body, ShouldEqual, p.body)
+				So(body, ShouldEqual, p.Body)
 			})
 		})
 	})
