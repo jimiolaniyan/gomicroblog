@@ -343,6 +343,10 @@ func (svc *service) GetUserFriends(username string) ([]UserInfo, error) {
 		return nil, err
 	}
 
+	if len(user.Friends) < 1 {
+		return []UserInfo{}, nil
+	}
+
 	friends, err := svc.users.FindByIDs(user.Friends)
 	if err != nil {
 		return nil, err
@@ -355,6 +359,10 @@ func (svc *service) GetUserFollowers(username string) ([]UserInfo, error) {
 	user, err := svc.findUser(username)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(user.Followers) < 1 {
+		return []UserInfo{}, nil
 	}
 
 	followers, err := svc.users.FindByIDs(user.Followers)
