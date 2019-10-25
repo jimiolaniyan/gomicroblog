@@ -42,12 +42,29 @@ func (repo *userRepository) FindByName(username string) (*user, error) {
 	return nil, ErrNotFound
 }
 
+func (repo *userRepository) Update(u *user) error {
+	// We don't need to do anything for in-memory implementations
+	// since updating is taken care of when using pointers
+	return nil
+}
+
 func (repo *userRepository) Delete(id ID) error {
 	if _, ok := repo.users[id]; !ok {
 		return ErrNotFound
 	}
 	delete(repo.users, id)
 	return nil
+}
+
+func (repo *userRepository) FindByIDs(ids []ID) ([]user, error) {
+	users := []user{}
+	for _, id := range ids {
+		if u, _ := repo.FindByID(id); u != nil {
+			users = append(users, *u)
+		}
+
+	}
+	return users, nil
 }
 
 type postRepository struct {
@@ -79,10 +96,11 @@ func (repo *postRepository) FindLatestPostsForUser(id ID) ([]*post, error) {
 }
 
 func (repo *postRepository) FindLatestPostsForUserAndFriends(user *user) ([]*post, error) {
-	posts := repo.FindUserPosts(user.ID)
+	id := user.ID
+	posts := repo.FindUserPosts(id)
 
-	for _, user := range user.Friends {
-		ps := repo.FindUserPosts(user.ID)
+	for _, id := range user.Friends {
+		ps := repo.FindUserPosts(id)
 		posts = append(posts, ps...)
 	}
 
@@ -103,6 +121,6 @@ func (repo *postRepository) FindUserPosts(id ID) []*post {
 
 func sortPostsByTimestamp(posts []*post) {
 	sort.Slice(posts, func(i, j int) bool {
-		return posts[i].timestamp.After(posts[j].timestamp)
+		return posts[i].Timestamp.After(posts[j].Timestamp)
 	})
 }

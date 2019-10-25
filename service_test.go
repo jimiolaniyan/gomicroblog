@@ -112,9 +112,9 @@ func (ts *ServiceTestSuite) TestService_CreatePost() {
 		if tt.wantValidID {
 			post, err := ts.svc.posts.FindByID(id)
 			assert.Nil(ts.T(), err)
-			assert.Equal(ts.T(), tt.body, post.body)
+			assert.Equal(ts.T(), tt.body, post.Body)
 			assert.Equal(ts.T(), tt.userID, post.Author.UserID)
-			assert.Equal(ts.T(), tt.wantTS, post.timestamp.After(now))
+			assert.Equal(ts.T(), tt.wantTS, post.Timestamp.After(now))
 		}
 	}
 }

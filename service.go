@@ -257,7 +257,10 @@ func (svc *service) EditProfile(id ID, req editProfileRequest) error {
 			return err
 		}
 	}
-	// TODO May need to call svc.users.Store with a real DB
+
+	if err := svc.users.Update(user); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -273,7 +276,7 @@ func (svc *service) UpdateLastSeen(id ID) error {
 	}
 
 	user.lastSeen = time.Now().UTC()
-	err = svc.users.Store(user)
+	err = svc.users.Update(user)
 	if err != nil {
 		return fmt.Errorf("error updating last seen: %s", err.Error())
 	}
@@ -295,7 +298,15 @@ func (svc *service) CreateRelationshipFor(id ID, username string) error {
 	}
 
 	u1.Follow(u2)
-	// TODO May need to call svc.users.Store with a real DB
+
+	if err = svc.users.Update(u1); err != nil {
+		return err
+	}
+
+	if err = svc.users.Update(u2); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -314,6 +325,15 @@ func (svc *service) RemoveRelationshipFor(id ID, username string) error {
 	}
 
 	u1.Unfollow(u2)
+
+	if err = svc.users.Update(u1); err != nil {
+		return err
+	}
+
+	if err = svc.users.Update(u2); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -323,7 +343,16 @@ func (svc *service) GetUserFriends(username string) ([]UserInfo, error) {
 		return nil, err
 	}
 
-	return buildUserInfosFromUsers(user.Friends), nil
+	if len(user.Friends) < 1 {
+		return []UserInfo{}, nil
+	}
+
+	friends, err := svc.users.FindByIDs(user.Friends)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildUserInfosFromUsers(friends), nil
 }
 
 func (svc *service) GetUserFollowers(username string) ([]UserInfo, error) {
@@ -332,7 +361,16 @@ func (svc *service) GetUserFollowers(username string) ([]UserInfo, error) {
 		return nil, err
 	}
 
-	return buildUserInfosFromUsers(user.Followers), nil
+	if len(user.Followers) < 1 {
+		return []UserInfo{}, nil
+	}
+
+	followers, err := svc.users.FindByIDs(user.Followers)
+	if err != nil {
+		return nil, err
+	}
+
+	return buildUserInfosFromUsers(followers), nil
 }
 
 func (svc *service) GetTimeline(id ID) ([]postResponse, error) {
@@ -384,7 +422,7 @@ func (svc *service) findUser(username string) (*user, error) {
 	return user, nil
 }
 
-func buildUserInfosFromUsers(users map[ID]*user) []UserInfo {
+func buildUserInfosFromUsers(users []user) []UserInfo {
 	var infos = []UserInfo{}
 	for _, user := range users {
 		infos = append(infos, UserInfo{
@@ -425,8 +463,8 @@ func buildPostResponses(posts []*post, user *user) []postResponse {
 	for _, p := range posts {
 		pr := postResponse{
 			ID:        p.ID,
-			Body:      p.body,
-			Timestamp: p.timestamp,
+			Body:      p.Body,
+			Timestamp: p.Timestamp,
 			Author: authorResponse{
 				UserID:   user.ID,
 				Username: user.username,

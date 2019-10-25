@@ -8,11 +8,18 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/julienschmidt/httprouter"
 
@@ -23,19 +30,65 @@ import (
 
 type HandlerTestSuite struct {
 	suite.Suite
-	userID ID
-	svc    Service
-	req    registerUserRequest
+	userID      ID
+	svc         Service
+	req         registerUserRequest
+	containerID string
+	client      *mongo.Client
 }
 
 func (hs *HandlerTestSuite) SetupSuite() {
-	hs.svc = NewService(NewUserRepository(), NewPostRepository())
+	var users Repository
+	var posts PostRepository
+
+	if !testing.Short() {
+		containerID, err := RunDockerContainer("mongo:latest")
+		require.NoError(hs.T(), err)
+
+		hs.containerID = containerID
+
+		log.Println("Container id:", containerID)
+
+		ip, _ := GetContainerIP(containerID)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+ip+":27017"))
+		require.NoError(hs.T(), err)
+
+		err = client.Ping(ctx, nil)
+		require.NoError(hs.T(), err)
+
+		hs.client = client
+
+		u := client.Database("testing").Collection("users")
+		p := client.Database("testing").Collection("posts")
+		users = NewMongoUserRepository(u)
+		posts = NewMongoPostRepository(p)
+	} else {
+		users = NewUserRepository()
+		posts = NewPostRepository()
+	}
+
+	hs.svc = NewService(users, posts)
 	hs.req = registerUserRequest{"user", "password", "a@b.com"}
 	id, _ := hs.svc.RegisterNewUser(hs.req)
 	hs.userID = id
 }
 
-func TestDecodeRequest(t *testing.T) {
+func (hs *HandlerTestSuite) TearDownSuite() {
+	if !testing.Short() {
+		_ = hs.client.Disconnect(context.Background())
+
+		// kill docker container
+		_ = exec.Command("docker", "kill", hs.containerID).Run()
+	}
+}
+
+var nilErr = errors.New("")
+
+func (hs *HandlerTestSuite) TestDecodeRequest() {
 	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
 	loginReq := `{"username": "jimi", "password": "password1"}`
 	createPostReq := `{"body": "a simple post"}`
@@ -57,20 +110,16 @@ func TestDecodeRequest(t *testing.T) {
 	for _, tt := range tests {
 		body := ioutil.NopCloser(strings.NewReader(tt.r))
 		req, err := tt.decoder(body)
-		assert.Equal(t, tt.wantErr, err)
-		assert.Equal(t, tt.wantReq, req)
+		assert.Equal(hs.T(), tt.wantErr, err)
+		assert.Equal(hs.T(), tt.wantReq, req)
 	}
 }
 
-var nilErr = errors.New("")
-
 func (hs *HandlerTestSuite) TestRegisterNewUserHandler() {
-	svc := &service{users: NewUserRepository()}
-
-	registerReq := `{"username":"jimi", "password":"password1", "email":"test@tester.test"}`
-	invalidPassReq := `{"username": "username", "password": "pass", "email": "a@b.com"}`
 	invalidUsernameReq := `{"username": "", "password": "pass"}`
+	invalidPassReq := `{"username": "username", "password": "pass", "email": "a@b.com"}`
 	invalidEmailReq := `{"username": "username", "password": "password", "email": "ab.com"}`
+	registerReq := `{"username":"jimi", "password":"password1", "email":"test@tester.test"}`
 	existingUserReq := `{"username": "jimi", "password": "password", "email": "a@b.com"}`
 	existingEmailReq := `{"username": "username", "password": "password", "email": "test@tester.test"}`
 
@@ -95,7 +144,7 @@ func (hs *HandlerTestSuite) TestRegisterNewUserHandler() {
 
 		w := httptest.NewRecorder()
 		handler := http.NewServeMux()
-		handler.Handle("/v1/users", RegisterUserHandler(svc))
+		handler.Handle("/v1/users", RegisterUserHandler(hs.svc))
 		handler.ServeHTTP(w, r)
 
 		var res struct {
@@ -201,9 +250,13 @@ func (hs *HandlerTestSuite) TestCreatePostHandler() {
 }
 
 func (hs *HandlerTestSuite) TestGetProfileHandler() {
-	u := hs.req.Username
+	u := "postu"
 	host := "http://localhost:8080"
 	finalURL := fmt.Sprintf("%s/v1/users/%s", host, u)
+
+	id, _ := hs.svc.RegisterNewUser(registerUserRequest{"postu", "password", "e@mma.com"})
+	_, _ = hs.svc.CreatePost(hs.userID, "post")
+	_, _ = hs.svc.CreatePost(id, "post")
 
 	tests := []struct {
 		username              string
@@ -211,10 +264,11 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 		wantErr               error
 		wantID                bool
 		wantUsername, wantURL string
+		wantPosLen            int
 	}{
 		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr, wantUsername: ""},
 		{username: "nonexistent", wantCode: http.StatusNotFound, wantErr: ErrNotFound, wantUsername: ""},
-		{username: u, wantCode: http.StatusOK, wantErr: nilErr, wantID: true, wantUsername: u, wantURL: finalURL},
+		{username: u, wantCode: http.StatusOK, wantErr: nilErr, wantID: true, wantUsername: u, wantURL: finalURL, wantPosLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -239,6 +293,7 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
 		assert.Equal(hs.T(), tt.wantID, IsValidID(string(res.Profile.ID)))
 		assert.Equal(hs.T(), tt.wantUsername, res.Profile.Username)
+		assert.Equal(hs.T(), tt.wantPosLen, len(res.Profile.Posts))
 		assert.Equal(hs.T(), tt.wantURL, res.URL)
 	}
 
@@ -474,7 +529,7 @@ func (hs *HandlerTestSuite) TestGetRelationships() {
 
 var invalidToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"
 
-func TestRequireAuthMiddleware(t *testing.T) {
+func (hs *HandlerTestSuite) TestRequireAuthMiddleware() {
 	validToken, _ := getJWTToken("randomid")
 
 	tests := []struct {
@@ -498,7 +553,6 @@ func TestRequireAuthMiddleware(t *testing.T) {
 	})
 
 	for _, tt := range tests {
-
 		h := RequireAuth(f)
 		r, _ := http.NewRequest(http.MethodPost, "/v1/posts", nil)
 		r.Header.Set("Authorization", tt.authHeader)
@@ -509,9 +563,9 @@ func TestRequireAuthMiddleware(t *testing.T) {
 
 		mux.ServeHTTP(w, r)
 
-		assert.IsType(t, new(http.Handler), &h)
-		assert.Equal(t, tt.wantID, id)
-		assert.Equal(t, tt.wantCode, w.Code)
+		assert.IsType(hs.T(), new(http.Handler), &h)
+		assert.Equal(hs.T(), tt.wantID, id)
+		assert.Equal(hs.T(), tt.wantCode, w.Code)
 	}
 }
 

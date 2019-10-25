@@ -1,9 +1,18 @@
+sudo: required
+
 language: go
+
+services:
+  - docker
 
 branches:
   only:
     - master
     - /^feature\/.+$/
+
+before_install:
+  - docker pull mongo
+
 go:
   - 1.11.x
 env:
