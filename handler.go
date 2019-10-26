@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
@@ -17,6 +18,8 @@ import (
 type key string
 
 const idKey = key("auth")
+
+var signingKey = []byte(os.Getenv("AUTH_SIGNING_KEY"))
 
 func RegisterUserHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -266,7 +269,7 @@ func parseTokenStr(tokenStr string) (*jwt.Token, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("error verifying signing method")
 		}
-		return []byte("e624d92e3fa438b6a8fac4f698e977cd"), nil
+		return signingKey, nil
 	})
 	return token, err
 }
@@ -291,9 +294,8 @@ func getTokenStrFromRequest(r *http.Request) string {
 }
 
 func getJWTToken(id string) (string, error) {
-	key := []byte("e624d92e3fa438b6a8fac4f698e977cd")
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{Issuer: "auth", Subject: id})
-	return token.SignedString(key)
+	return token.SignedString(signingKey)
 }
 
 func encodeError(err error, w http.ResponseWriter) {

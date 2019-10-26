@@ -16,6 +16,11 @@ application in Golang using TDD, BDD and Robert C. Martin's Clean Architecture.
 - Start the server  
 `./blog`
 
+### Run in docker container
+Within the project directory:  
+`docker image build -t microblog:0.3.0 .`  
+`docker container run -p 8090:8090 --name microblog microblog:0.3.0`
+
 ## API Requests 
 See `api/requests.http` for full examples.
 ### Register new user

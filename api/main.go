@@ -24,5 +24,5 @@ func main() {
 	router.Handler(http.MethodDelete, "/v1/users/:username/followers", RequireAuth(LastSeenMiddleware(RemoveRelationshipHandler(svc), svc)))
 
 	log.Printf("Server started. Listening on port: %s\n", "8090")
-	log.Fatal(http.ListenAndServe(":"+("8090"), router))
+	log.Fatal(http.ListenAndServe(":"+"8090", router))
 }
