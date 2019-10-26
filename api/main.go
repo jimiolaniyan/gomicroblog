@@ -1,16 +1,40 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	. "github.com/jimiolaniyan/gomicroblog"
 )
 
+var dbURL = os.Getenv("DATABASE_URL")
+var dbName = os.Getenv("DATABASE_NAME")
+
 func main() {
-	svc := NewService(NewUserRepository(), NewPostRepository())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+dbURL))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = client.Ping(ctx, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	u := client.Database(dbName).Collection("users")
+	p := client.Database(dbName).Collection("posts")
+
+	svc := NewService(NewMongoUserRepository(u), NewMongoPostRepository(p))
 
 	router := httprouter.New()
 	router.Handler(http.MethodPost, "/v1/users", RegisterUserHandler(svc))
