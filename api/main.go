@@ -4,21 +4,24 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/julienschmidt/httprouter"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/julienschmidt/httprouter"
-
 	. "github.com/jimiolaniyan/gomicroblog"
 )
+
+var dbURL = os.Getenv("DATABASE_URL")
+var dbName = os.Getenv("DATABASE_NAME")
 
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://127.0.0.1:27017"))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://"+dbURL))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,8 +31,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	u := client.Database("microblog").Collection("users")
-	p := client.Database("microblog").Collection("posts")
+	u := client.Database(dbName).Collection("users")
+	p := client.Database(dbName).Collection("posts")
 
 	svc := NewService(NewMongoUserRepository(u), NewMongoPostRepository(p))
 
@@ -45,5 +48,5 @@ func main() {
 	router.Handler(http.MethodDelete, "/v1/users/:username/followers", RequireAuth(LastSeenMiddleware(RemoveRelationshipHandler(svc), svc)))
 
 	log.Printf("Server started. Listening on port: %s\n", "8090")
-	log.Fatal(http.ListenAndServe(":"+("8090"), router))
+	log.Fatal(http.ListenAndServe(":"+"8090", router))
 }
