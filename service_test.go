@@ -1,4 +1,4 @@
-package gomicroblog
+package blog
 
 import (
 	"fmt"
