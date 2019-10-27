@@ -8,6 +8,7 @@ services:
 branches:
   only:
     - master
+    - dev
     - /^feature\/.+$/
 
 before_install:

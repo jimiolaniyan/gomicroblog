@@ -1,0 +1,24 @@
+version: "2"
+services:
+  db:
+    image: mongo:latest
+    container_name: db
+    ports:
+      - 27018:27017
+    volumes:
+      - dbdata:/data/db
+  api:
+    build: .
+    container_name: api
+    depends_on:
+      - db
+    ports:
+      - 8090:8090
+    volumes:
+      - .:/code
+    environment:
+      - "DATABASE_NAME=${DATABASE_NAME}"
+      - "DATABASE_URL=${DB_URL}"
+      - "AUTH_SIGNING_KEY=${AUTH_KEY}"
+volumes:
+  dbdata:
