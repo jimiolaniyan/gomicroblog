@@ -14,7 +14,7 @@ type ServiceTestSuite struct {
 	svc    service
 	req    registerUserRequest
 	userID ID
-	user   *user
+	user   *User
 }
 
 func (ts *ServiceTestSuite) TearDownTest() {

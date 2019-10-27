@@ -16,12 +16,12 @@ func TestHashPassword_ReturnsCorrectHash(t *testing.T) {
 }
 
 func TestNewUser(t *testing.T) {
-	u := &user{username: "user", email: "e@m.co"}
+	u := &User{username: "user", email: "e@m.co"}
 
 	tests := []struct {
 		username, email string
 		wantErr         error
-		wantUser        *user
+		wantUser        *User
 	}{
 		{wantErr: ErrInvalidUsername},
 		{username: "username", wantErr: ErrInvalidEmail},

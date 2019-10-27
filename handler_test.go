@@ -86,7 +86,7 @@ func (hs *HandlerTestSuite) TearDownSuite() {
 	}
 }
 
-var nilErr = errors.New("")
+var errNil = errors.New("")
 
 func (hs *HandlerTestSuite) TestDecodeRequest() {
 	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
@@ -130,11 +130,11 @@ func (hs *HandlerTestSuite) TestRegisterNewUserHandler() {
 		wantErr      error
 		wantLocation string
 	}{
-		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: errNil},
 		{req: invalidUsernameReq, wantCode: http.StatusUnprocessableEntity, wantErr: ErrInvalidUsername},
 		{req: invalidPassReq, wantCode: http.StatusUnprocessableEntity, wantErr: ErrInvalidPassword},
 		{req: invalidEmailReq, wantCode: http.StatusUnprocessableEntity, wantErr: ErrInvalidEmail},
-		{req: registerReq, wantCode: http.StatusCreated, wantID: true, wantErr: nilErr, wantLocation: "/v1/users"},
+		{req: registerReq, wantCode: http.StatusCreated, wantID: true, wantErr: errNil, wantLocation: "/v1/users"},
 		{req: existingUserReq, wantCode: http.StatusConflict, wantErr: ErrExistingUsername},
 		{req: existingEmailReq, wantCode: http.StatusConflict, wantErr: ErrExistingEmail},
 	}
@@ -213,12 +213,12 @@ func (hs *HandlerTestSuite) TestCreatePostHandler() {
 		wantID, withCtx bool
 		wantLoc         string
 	}{
-		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: nilErr, withCtx: true},
+		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: errNil, withCtx: true},
 		{req: `{}`, wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{req: b, wantCode: http.StatusUnauthorized, wantErr: ErrInvalidID, withCtx: true},
 		{req: b, userID: "puoiwoerigp", wantCode: http.StatusUnauthorized, wantErr: ErrInvalidID, withCtx: true},
 		{req: b, userID: uid, wantCode: http.StatusUnprocessableEntity, wantErr: ErrEmptyBody, withCtx: true},
-		{req: body, userID: uid, wantCode: http.StatusCreated, wantErr: nilErr, wantID: true, wantLoc: "/v1/posts/", withCtx: true},
+		{req: body, userID: uid, wantCode: http.StatusCreated, wantErr: errNil, wantID: true, wantLoc: "/v1/posts/", withCtx: true},
 	}
 
 	for _, tt := range tests {
@@ -266,9 +266,9 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 		wantUsername, wantURL string
 		wantPosLen            int
 	}{
-		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr, wantUsername: ""},
+		{username: "  ", wantCode: http.StatusBadRequest, wantErr: errNil, wantUsername: ""},
 		{username: "nonexistent", wantCode: http.StatusNotFound, wantErr: ErrNotFound, wantUsername: ""},
-		{username: u, wantCode: http.StatusOK, wantErr: nilErr, wantID: true, wantUsername: u, wantURL: finalURL, wantPosLen: 1},
+		{username: u, wantCode: http.StatusOK, wantErr: errNil, wantID: true, wantUsername: u, wantURL: finalURL, wantPosLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -318,18 +318,18 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 		wantErr               error
 		wantUsername, wantBio string
 	}{
-		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: errNil},
 		{req: `{}`, wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{req: `{}`, id: "invalid", wantCode: http.StatusUnauthorized, withCtx: true, wantErr: ErrInvalidID},
-		{req: `{}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr},
+		{req: `{}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
 		{req: `{"username": ""}`, id: sid, wantCode: S422, withCtx: true, wantErr: ErrInvalidUsername},
-		{req: fmt.Sprintf(`{"username": "%s"}`, req.Username), id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr},
+		{req: fmt.Sprintf(`{"username": "%s"}`, req.Username), id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
 		{req: fmt.Sprintf(`{"username": "%s"}`, hs.req.Username), id: sid, wantCode: http.StatusConflict, withCtx: true, wantErr: ErrExistingUsername},
-		{req: `{"username": "newName"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr, wantUsername: "newName", reset: true},
-		{req: `{"bio": ""}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr},
+		{req: `{"username": "newName"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil, wantUsername: "newName", reset: true},
+		{req: `{"bio": ""}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
 		{req: fmt.Sprintf(`{"bio": "%s"}`, longBio), id: sid, wantCode: S422, withCtx: true, wantErr: ErrBioTooLong},
-		{req: `{"bio": "Bios"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr, wantBio: "Bios"},
-		{req: `{"username": "newU", "bio": "Be nice"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr, wantBio: "Be nice", wantUsername: "newU"},
+		{req: `{"bio": "Bios"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil, wantBio: "Bios"},
+		{req: `{"username": "newU", "bio": "Be nice"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil, wantBio: "Be nice", wantUsername: "newU"},
 	}
 
 	for _, tt := range tests {
@@ -400,11 +400,11 @@ func (hs *HandlerTestSuite) TestCreateRelationshipHandler() {
 		wantCode int
 		wantErr  error
 	}{
-		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{username: "  ", wantCode: http.StatusBadRequest, wantErr: errNil},
 		{username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
 		{username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantFollowSelf},
-		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: nilErr},
+		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: errNil},
 		{username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrAlreadyFollowing},
 	}
 
@@ -449,11 +449,11 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 		wantCode int
 		wantErr  error
 	}{
-		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{username: "  ", wantCode: http.StatusBadRequest, wantErr: errNil},
 		{username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
 		{username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantUnFollowSelf},
-		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: nilErr},
+		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: errNil},
 		{username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrNotFollowing},
 	}
 

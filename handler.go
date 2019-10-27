@@ -82,7 +82,7 @@ func CreatePostHandler(svc Service) http.Handler {
 		}
 
 		req := request.(createPostRequest)
-		postId, err := svc.CreatePost(ID(userID), req.Body)
+		postID, err := svc.CreatePost(ID(userID), req.Body)
 
 		if err != nil {
 			encodeError(err, w)
@@ -90,9 +90,9 @@ func CreatePostHandler(svc Service) http.Handler {
 		}
 
 		location := strings.Join(strings.Split(r.URL.Path, "/")[0:3], "/")
-		w.Header().Set("Location", fmt.Sprintf("%s/%s", location, postId))
+		w.Header().Set("Location", fmt.Sprintf("%s/%s", location, postID))
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(&createPostResponse{ID: postId}); err != nil {
+		if err := json.NewEncoder(w).Encode(&createPostResponse{ID: postID}); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	})

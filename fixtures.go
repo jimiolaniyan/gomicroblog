@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func duplicateUser(s service, u user, username string) *user {
+func duplicateUser(s service, u User, username string) *User {
 	u1 := u
 	u1.ID = nextID()
 	u1.username = username

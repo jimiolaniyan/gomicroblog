@@ -14,7 +14,7 @@ type Service interface {
 	RegisterNewUser(req registerUserRequest) (ID, error)  //auth
 	ValidateUser(req validateUserRequest) (ID, error)     //auth
 	CreatePost(id ID, body string) (PostID, error)        //messaging
-	GetUserPosts(username string) ([]*post, error)        //messaging
+	GetUserPosts(username string) ([]*Post, error)        //messaging
 	GetProfile(username string) (Profile, error)          //profile
 	UpdateLastSeen(id ID) error                           //profile
 	EditProfile(id ID, req editProfileRequest) error      //profile
@@ -154,7 +154,7 @@ func (svc *service) ValidateUser(req validateUserRequest) (ID, error) {
 	return user.ID, nil
 }
 
-func verifyNotInUse(svc *service, username string, email string) (*user, error) {
+func verifyNotInUse(svc *service, username string, email string) (*User, error) {
 	if u, _ := svc.users.FindByName(username); u != nil {
 		return nil, ErrExistingUsername
 	}
@@ -189,7 +189,7 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 	return post.ID, nil
 }
 
-func (svc *service) GetUserPosts(username string) ([]*post, error) {
+func (svc *service) GetUserPosts(username string) ([]*Post, error) {
 	if username == "" {
 		return nil, ErrInvalidUsername
 	}
@@ -389,7 +389,7 @@ func (svc *service) GetTimeline(id ID) ([]postResponse, error) {
 }
 
 // TODO refactor this to use get U1 and U2 separately
-func (svc *service) getU1U2(id ID, username string) (u1 *user, u2 *user, err error) {
+func (svc *service) getU1U2(id ID, username string) (u1 *User, u2 *User, err error) {
 	if !IsValidID(string(id)) {
 		return nil, nil, ErrInvalidID
 	}
@@ -411,7 +411,7 @@ func (svc *service) getU1U2(id ID, username string) (u1 *user, u2 *user, err err
 	return
 }
 
-func (svc *service) findUser(username string) (*user, error) {
+func (svc *service) findUser(username string) (*User, error) {
 	if username == "" {
 		return nil, ErrInvalidUsername
 	}
@@ -422,7 +422,7 @@ func (svc *service) findUser(username string) (*user, error) {
 	return user, nil
 }
 
-func buildUserInfosFromUsers(users []user) []UserInfo {
+func buildUserInfosFromUsers(users []User) []UserInfo {
 	var infos = []UserInfo{}
 	for _, user := range users {
 		infos = append(infos, UserInfo{
@@ -436,7 +436,7 @@ func buildUserInfosFromUsers(users []user) []UserInfo {
 	return infos
 }
 
-func (svc *service) updateUsername(username *string, user *user) error {
+func (svc *service) updateUsername(username *string, user *User) error {
 	u := strings.TrimSpace(*username)
 	if u == "" {
 		return ErrInvalidUsername
@@ -448,7 +448,7 @@ func (svc *service) updateUsername(username *string, user *user) error {
 	return nil
 }
 
-func updateBio(bio *string, user *user) error {
+func updateBio(bio *string, user *User) error {
 	b := strings.TrimSpace(*bio)
 	if len(b) > 140 {
 		return ErrBioTooLong
@@ -457,7 +457,7 @@ func updateBio(bio *string, user *user) error {
 	return nil
 }
 
-func buildPostResponses(posts []*post, user *user) []postResponse {
+func buildPostResponses(posts []*Post, user *User) []postResponse {
 	var res = []postResponse{}
 
 	for _, p := range posts {

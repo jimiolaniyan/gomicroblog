@@ -16,7 +16,7 @@ type BddTestSuite struct {
 	req    registerUserRequest
 	now    time.Time
 	userID ID
-	user   *user
+	user   *User
 }
 
 func (bs *BddTestSuite) SetupSuite() {
@@ -83,13 +83,13 @@ func (bs *BddTestSuite) TestPostCreation() {
 		body := "P"
 
 		Convey("When U creates P", func() {
-			postId, err := bs.svc.CreatePost(bs.userID, body)
+			postID, err := bs.svc.CreatePost(bs.userID, body)
 			So(err, ShouldBeNil)
-			So(IsValidID(string(postId)), ShouldBeTrue)
+			So(IsValidID(string(postID)), ShouldBeTrue)
 
 			Convey("Then the user's posts will contain P", func() {
 				posts, _ := bs.svc.GetUserPosts(bs.req.Username)
-				p := &post{}
+				p := &Post{}
 
 				for _, post := range posts {
 					if post.Author.UserID == bs.userID && post.Body == body {
@@ -98,7 +98,7 @@ func (bs *BddTestSuite) TestPostCreation() {
 				}
 
 				So(p, ShouldNotBeNil)
-				So(postId, ShouldEqual, p.ID)
+				So(postID, ShouldEqual, p.ID)
 				So(body, ShouldEqual, p.Body)
 			})
 		})
@@ -349,7 +349,7 @@ func (bs *BddTestSuite) TestTimelines() {
 	})
 }
 
-func createInfoFromUser(u2 *user) UserInfo {
+func createInfoFromUser(u2 *User) UserInfo {
 	return UserInfo{
 		ID:       u2.ID,
 		Username: u2.username,
