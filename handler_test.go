@@ -33,6 +33,8 @@ type HandlerTestSuite struct {
 	userID      ID
 	svc         Service
 	req         registerUserRequest
+	user        *User
+	users       Repository
 	containerID string
 	client      *mongo.Client
 }
@@ -71,10 +73,15 @@ func (hs *HandlerTestSuite) SetupSuite() {
 		posts = NewPostRepository()
 	}
 
+	hs.users = users
 	hs.svc = NewService(users, posts)
 	hs.req = registerUserRequest{"user", "password", "a@b.com"}
+
 	id, _ := hs.svc.RegisterNewUser(hs.req)
 	hs.userID = id
+
+	u, _ := users.FindByID(id)
+	hs.user = u
 }
 
 func (hs *HandlerTestSuite) TearDownSuite() {
@@ -254,9 +261,9 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 	host := "http://localhost:8080"
 	finalURL := fmt.Sprintf("%s/v1/users/%s", host, u)
 
-	id, _ := hs.svc.RegisterNewUser(registerUserRequest{"postu", "password", "e@mma.com"})
+	user := DuplicateUser(hs.users, *hs.user, u)
 	_, _ = hs.svc.CreatePost(hs.userID, "post")
-	_, _ = hs.svc.CreatePost(id, "post")
+	_, _ = hs.svc.CreatePost(user.ID, "post")
 
 	tests := []struct {
 		username              string
@@ -300,10 +307,10 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 }
 
 func (hs *HandlerTestSuite) TestEditProfileHandler() {
-	// register new user to avoid conflicts with user in the suite
-	req := registerUserRequest{"tempUser", "password", "temp@mail.com"}
-	id, _ := hs.svc.RegisterNewUser(req)
-	sid := string(id)
+	// duplicate user to avoid conflicts with user in the suite
+	username := "tempUser"
+	user := DuplicateUser(hs.users, *hs.user, username)
+	sid := string(user.ID)
 
 	longBio := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut " +
 		"labore et dolore magna aliqua. Ut enim ad minim h"
@@ -323,7 +330,7 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 		{req: `{}`, id: "invalid", wantCode: http.StatusUnauthorized, withCtx: true, wantErr: ErrInvalidID},
 		{req: `{}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
 		{req: `{"username": ""}`, id: sid, wantCode: S422, withCtx: true, wantErr: ErrInvalidUsername},
-		{req: fmt.Sprintf(`{"username": "%s"}`, req.Username), id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
+		{req: fmt.Sprintf(`{"username": "%s"}`, username), id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
 		{req: fmt.Sprintf(`{"username": "%s"}`, hs.req.Username), id: sid, wantCode: http.StatusConflict, withCtx: true, wantErr: ErrExistingUsername},
 		{req: `{"username": "newName"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil, wantUsername: "newName", reset: true},
 		{req: `{"bio": ""}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
@@ -335,7 +342,7 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 	for _, tt := range tests {
 		r, _ := http.NewRequest(http.MethodPatch, "/v1/users", strings.NewReader(tt.req))
 
-		u := req.Username
+		u := username
 		if len(tt.wantUsername) > 0 {
 			u = tt.wantUsername
 		}
@@ -374,12 +381,12 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 		if len(tt.wantUsername) > 0 {
 			assert.Equal(hs.T(), tt.wantUsername, res2.Profile.Username)
 		} else {
-			assert.Equal(hs.T(), req.Username, res2.Profile.Username)
+			assert.Equal(hs.T(), username, res2.Profile.Username)
 		}
 
 		//reset the username and bio
 		if tt.reset {
-			body := strings.NewReader(fmt.Sprintf(`{"username": "%s", "bio": ""}`, req.Username))
+			body := strings.NewReader(fmt.Sprintf(`{"username": "%s", "bio": ""}`, username))
 			r3, _ := http.NewRequest(http.MethodPatch, "/v1/users", body)
 			r3 = r3.WithContext(context.WithValue(r3.Context(), idKey, tt.id))
 			router.ServeHTTP(w, r3)
@@ -391,8 +398,7 @@ func (hs *HandlerTestSuite) TestCreateRelationshipHandler() {
 	uid := string(hs.userID)
 
 	u := "followUser"
-	_, err := hs.svc.RegisterNewUser(registerUserRequest{u, "password", "f@u.co"})
-	assert.Nil(hs.T(), err)
+	DuplicateUser(hs.users, *hs.user, u)
 
 	tests := []struct {
 		username string
@@ -440,7 +446,7 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 	uid := string(hs.userID)
 
 	u := "unFollowUser"
-	_, _ = hs.svc.RegisterNewUser(registerUserRequest{u, "password", "u@u.co"})
+	DuplicateUser(hs.users, *hs.user, u)
 	_ = hs.svc.CreateRelationshipFor(ID(uid), u)
 
 	tests := []struct {
@@ -483,8 +489,8 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 
 func (hs *HandlerTestSuite) TestGetRelationships() {
 	u := "follower"
-	id, _ := hs.svc.RegisterNewUser(registerUserRequest{u, "password", "usf@uf.co"})
-	_ = hs.svc.CreateRelationshipFor(id, hs.req.Username)
+	user := DuplicateUser(hs.users, *hs.user, u)
+	_ = hs.svc.CreateRelationshipFor(user.ID, hs.req.Username)
 	_ = hs.svc.CreateRelationshipFor(hs.userID, u)
 
 	tests := []struct {

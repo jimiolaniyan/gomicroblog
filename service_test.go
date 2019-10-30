@@ -246,8 +246,8 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 }
 
 func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
-	u1 := duplicateUser(ts.svc, *ts.user, "user1")
-	u2 := duplicateUser(ts.svc, *ts.user, "user2")
+	u1 := DuplicateUser(ts.svc.users, *ts.user, "user1")
+	u2 := DuplicateUser(ts.svc.users, *ts.user, "user2")
 
 	tests := []struct {
 		id         ID
@@ -279,8 +279,8 @@ func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
 }
 
 func (ts *ServiceTestSuite) TestRemoveRelationshipFor() {
-	u2 := duplicateUser(ts.svc, *ts.user, "abc")
-	u1 := duplicateUser(ts.svc, *ts.user, "xyz")
+	u2 := DuplicateUser(ts.svc.users, *ts.user, "abc")
+	u1 := DuplicateUser(ts.svc.users, *ts.user, "xyz")
 	u1.Follow(u2)
 
 	tests := []struct {
@@ -316,8 +316,8 @@ func (ts *ServiceTestSuite) TestRemoveRelationshipFor() {
 }
 
 func (ts *ServiceTestSuite) TestRelationships() {
-	u1 := duplicateUser(ts.svc, *ts.user, "u1")
-	u2 := duplicateUser(ts.svc, *ts.user, "u2")
+	u1 := DuplicateUser(ts.svc.users, *ts.user, "u1")
+	u2 := DuplicateUser(ts.svc.users, *ts.user, "u2")
 	u1.Follow(u2)
 
 	tests := []struct {
@@ -348,11 +348,11 @@ func (ts *ServiceTestSuite) TestRelationships() {
 }
 
 func (ts *ServiceTestSuite) TestGetTimeline() {
-	u1 := duplicateUser(ts.svc, *ts.user, "a1")
-	u2 := duplicateUser(ts.svc, *ts.user, "a2")
-	u3 := duplicateUser(ts.svc, *ts.user, "a3")
-	u4 := duplicateUser(ts.svc, *ts.user, "a4")
-	u5 := duplicateUser(ts.svc, *ts.user, "a5")
+	u1 := DuplicateUser(ts.svc.users, *ts.user, "a1")
+	u2 := DuplicateUser(ts.svc.users, *ts.user, "a2")
+	u3 := DuplicateUser(ts.svc.users, *ts.user, "a3")
+	u4 := DuplicateUser(ts.svc.users, *ts.user, "a4")
+	u5 := DuplicateUser(ts.svc.users, *ts.user, "a5")
 
 	u1.Follow(u2)
 	u1.Follow(u3)

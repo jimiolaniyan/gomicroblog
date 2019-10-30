@@ -136,7 +136,7 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 
 func (bs *BddTestSuite) TestProfileWithPostsAndFriends() {
 	Convey("Given a returning user U1 with posts", bs.T(), func() {
-		u1 := duplicateUser(bs.svc, *bs.user, "fU1")
+		u1 := DuplicateUser(bs.svc.users, *bs.user, "fU1")
 
 		postIDs, ok := createPosts(u1.ID, bs.svc)
 		So(ok, ShouldBeTrue)
@@ -145,7 +145,7 @@ func (bs *BddTestSuite) TestProfileWithPostsAndFriends() {
 		So(err, ShouldBeNil)
 
 		Convey("With U1 and U2 following each other", func() {
-			u2 := duplicateUser(bs.svc, *bs.user, "fU2")
+			u2 := DuplicateUser(bs.svc.users, *bs.user, "fU2")
 			u1.Follow(u2)
 			u2.Follow(u1)
 			Convey("When his profile is requested", func() {
@@ -217,8 +217,8 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 
 func (bs *BddTestSuite) TestRelationships_Create() {
 	Convey("Given two users U1 and U2 with no relationship", bs.T(), func() {
-		u1 := duplicateUser(bs.svc, *bs.user, "U1")
-		u2 := duplicateUser(bs.svc, *bs.user, "U2")
+		u1 := DuplicateUser(bs.svc.users, *bs.user, "U1")
+		u2 := DuplicateUser(bs.svc.users, *bs.user, "U2")
 
 		Convey("When U1 follows U2", func() {
 
@@ -261,8 +261,8 @@ func (bs *BddTestSuite) TestRelationships_Create() {
 
 func (bs *BddTestSuite) TestRelationships_Remove() {
 	Convey("Given two users U1 and U1", bs.T(), func() {
-		u1 := duplicateUser(bs.svc, *bs.user, "newU1")
-		u2 := duplicateUser(bs.svc, *bs.user, "newU2")
+		u1 := DuplicateUser(bs.svc.users, *bs.user, "newU1")
+		u2 := DuplicateUser(bs.svc.users, *bs.user, "newU2")
 
 		Convey("With U1 following U2", func() {
 			u1.Follow(u2)
@@ -305,9 +305,9 @@ func (bs *BddTestSuite) TestRelationships_Remove() {
 
 func (bs *BddTestSuite) TestTimelines() {
 	Convey("Given user U1 following U2 and U3 ", bs.T(), func() {
-		u1 := duplicateUser(bs.svc, *bs.user, "uu1")
-		u2 := duplicateUser(bs.svc, *bs.user, "uu2")
-		u3 := duplicateUser(bs.svc, *bs.user, "uu3")
+		u1 := DuplicateUser(bs.svc.users, *bs.user, "uu1")
+		u2 := DuplicateUser(bs.svc.users, *bs.user, "uu2")
+		u3 := DuplicateUser(bs.svc.users, *bs.user, "uu3")
 
 		u1.Follow(u2)
 		u1.Follow(u3)
