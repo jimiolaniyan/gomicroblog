@@ -52,8 +52,8 @@ var (
 	ErrNotFollowing       = errors.New("not following user")
 )
 
-func (u1 *User) IsFollowing(u2 *User) bool {
-	for _, id := range u1.Friends {
+func (u *User) IsFollowing(u2 *User) bool {
+	for _, id := range u.Friends {
 		if id == u2.ID {
 			return true
 		}
@@ -62,27 +62,36 @@ func (u1 *User) IsFollowing(u2 *User) bool {
 	return false
 }
 
-func (u1 *User) Follow(u2 *User) {
-	u1.Friends = append(u1.Friends, u2.ID)
-	u2.Followers = append(u2.Followers, u1.ID)
+func (u *User) Follow(u2 *User) {
+	u.Friends = append(u.Friends, u2.ID)
+	u2.Followers = append(u2.Followers, u.ID)
 }
 
-func (u1 *User) Unfollow(u2 *User) {
+func (u *User) Unfollow(u2 *User) {
 	// remove u2 from u1 friends
-	for i, id := range u1.Friends {
+	for i, id := range u.Friends {
 		if id == u2.ID {
-			u1.Friends = append(u1.Friends[:i], u1.Friends[i+1:]...)
+			u.Friends = append(u.Friends[:i], u.Friends[i+1:]...)
 			break
 		}
 	}
 
 	// remove u1 from u2 followers
 	for i, id := range u2.Followers {
-		if id == u1.ID {
+		if id == u.ID {
 			u2.Followers = append(u2.Followers[:i], u2.Followers[i+1:]...)
 			break
 		}
 	}
+}
+
+func (u *User) UpdateBio(bio string) error {
+	b := strings.TrimSpace(bio)
+	if len(b) > 140 {
+		return ErrBioTooLong
+	}
+	u.Bio = b
+	return nil
 }
 
 func NewUser(username, email string) (*User, error) {

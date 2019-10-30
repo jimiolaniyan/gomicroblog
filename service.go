@@ -253,7 +253,7 @@ func (svc *service) EditProfile(id ID, req editProfileRequest) error {
 	}
 
 	if req.Bio != nil {
-		if err := updateBio(req.Bio, user); err != nil {
+		if err := user.UpdateBio(*req.Bio); err != nil {
 			return err
 		}
 	}
@@ -445,15 +445,6 @@ func (svc *service) updateUsername(username *string, user *User) error {
 		return ErrExistingUsername
 	}
 	user.Username = u
-	return nil
-}
-
-func updateBio(bio *string, user *User) error {
-	b := strings.TrimSpace(*bio)
-	if len(b) > 140 {
-		return ErrBioTooLong
-	}
-	user.Bio = b
 	return nil
 }
 
