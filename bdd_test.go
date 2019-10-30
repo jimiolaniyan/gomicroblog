@@ -149,13 +149,13 @@ func (bs *BddTestSuite) TestProfileWithPostsAndFriends() {
 			u1.Follow(u2)
 			u2.Follow(u1)
 			Convey("When his profile is requested", func() {
-				profile, err := bs.svc.GetProfile(u1.username)
+				profile, err := bs.svc.GetProfile(u1.Username)
 
 				So(err, ShouldBeNil)
 				So(profile, ShouldNotBeNil)
 
 				Convey("Then his profile contains his posts in reverse chronological order", func() {
-					ar := authorResponse{Username: u1.username, UserID: u1.ID, Avatar: avatar("user@app.com")}
+					ar := authorResponse{Username: u1.Username, UserID: u1.ID, Avatar: avatar("user@app.com")}
 					expected := Profile{
 						Relationships: Relationships{Followers: 1, Friends: 1},
 						Posts: []postResponse{
@@ -170,7 +170,7 @@ func (bs *BddTestSuite) TestProfileWithPostsAndFriends() {
 
 					Convey("Add his last seen is updated.", func() {
 						user, _ := bs.svc.users.FindByID(u1.ID)
-						So(profile.LastSeen, ShouldEqual, user.lastSeen)
+						So(profile.LastSeen, ShouldEqual, user.LastSeen)
 						So(profile.LastSeen.After(profile.Joined), ShouldBeTrue)
 
 						Reset(func() {
@@ -188,7 +188,7 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 	Convey("Given a returning user U", bs.T(), func() {
 		existingUser := *bs.user
 		existingUser.ID = nextID()
-		existingUser.username = "newUsername"
+		existingUser.Username = "newUsername"
 
 		err := bs.svc.users.Store(&existingUser)
 		assert.Nil(bs.T(), err)
@@ -201,7 +201,7 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 			So(err, ShouldBeNil)
 
 			Convey("Then his profile shows the updated information", func() {
-				profile, err := bs.svc.GetProfile(existingUser.username)
+				profile, err := bs.svc.GetProfile(existingUser.Username)
 
 				So(err, ShouldBeNil)
 				So(profile.Username, ShouldEqual, newU)
@@ -222,14 +222,14 @@ func (bs *BddTestSuite) TestRelationships_Create() {
 
 		Convey("When U1 follows U2", func() {
 
-			err := bs.svc.CreateRelationshipFor(u1.ID, u2.username)
+			err := bs.svc.CreateRelationshipFor(u1.ID, u2.Username)
 			So(err, ShouldBeNil)
 
 			Convey("Then U1 is following U2", func() {
 				So(u1.IsFollowing(u2), ShouldBeTrue)
 
 				Convey("And U2 is in U1's friends list", func() {
-					friends, err := bs.svc.GetUserFriends(u1.username)
+					friends, err := bs.svc.GetUserFriends(u1.Username)
 
 					So(err, ShouldBeNil)
 
@@ -239,7 +239,7 @@ func (bs *BddTestSuite) TestRelationships_Create() {
 					So(userInfo, ShouldResemble, expectedUserInfo)
 
 					Convey("And U1 is in U2's followers list", func() {
-						followers, err := bs.svc.GetUserFollowers(u2.username)
+						followers, err := bs.svc.GetUserFollowers(u2.Username)
 
 						So(err, ShouldBeNil)
 
@@ -269,14 +269,14 @@ func (bs *BddTestSuite) TestRelationships_Remove() {
 			So(u1.IsFollowing(u2), ShouldBeTrue)
 
 			Convey("When U1 unfollows u2", func() {
-				err := bs.svc.RemoveRelationshipFor(u1.ID, u2.username)
+				err := bs.svc.RemoveRelationshipFor(u1.ID, u2.Username)
 				So(err, ShouldBeNil)
 
 				Convey("Then U1 is not following U2", func() {
 					So(u1.IsFollowing(u2), ShouldBeFalse)
 
 					Convey("And U2 is not in U1's friends list", func() {
-						friends, err := bs.svc.GetUserFriends(u1.username)
+						friends, err := bs.svc.GetUserFriends(u1.Username)
 
 						So(err, ShouldBeNil)
 
@@ -284,7 +284,7 @@ func (bs *BddTestSuite) TestRelationships_Remove() {
 						So(userInfo, ShouldResemble, UserInfo{})
 
 						Convey("And U1 is not in U2's follower's list", func() {
-							followers, err := bs.svc.GetUserFollowers(u2.username)
+							followers, err := bs.svc.GetUserFollowers(u2.Username)
 
 							So(err, ShouldBeNil)
 
@@ -325,7 +325,7 @@ func (bs *BddTestSuite) TestTimelines() {
 				So(err, ShouldBeNil)
 
 				Convey("Then his timeline is as follows", func() {
-					ar := authorResponse{u1.ID, u1.username, avatar(u1.email)}
+					ar := authorResponse{u1.ID, u1.Username, avatar(u1.Email)}
 					expectedTL := []postResponse{
 						{p12ID, posts[4], tl[0].Timestamp, ar},
 						{p32ID, posts[3], tl[1].Timestamp, ar},
@@ -352,10 +352,10 @@ func (bs *BddTestSuite) TestTimelines() {
 func createInfoFromUser(u2 *User) UserInfo {
 	return UserInfo{
 		ID:       u2.ID,
-		Username: u2.username,
-		Avatar:   avatar(u2.email),
-		Bio:      u2.bio,
-		Joined:   u2.createdAt,
+		Username: u2.Username,
+		Avatar:   avatar(u2.Email),
+		Bio:      u2.Bio,
+		Joined:   u2.CreatedAt,
 	}
 }
 

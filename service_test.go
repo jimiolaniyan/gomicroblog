@@ -57,9 +57,9 @@ func (ts *ServiceTestSuite) TestService_RegisterNewUser() {
 
 			user, _ := ts.svc.users.FindByID(userID)
 			if user != nil {
-				assert.Equal(ts.T(), tt.wantCreatedAt, user.createdAt.After(now))
-				assert.Equal(ts.T(), tt.wantLastSeen, user.lastSeen.After(now))
-				assert.True(ts.T(), checkPasswordHash(user.password, "password"))
+				assert.Equal(ts.T(), tt.wantCreatedAt, user.CreatedAt.After(now))
+				assert.Equal(ts.T(), tt.wantLastSeen, user.LastSeen.After(now))
+				assert.True(ts.T(), checkPasswordHash(user.Password, "password"))
 			}
 		})
 	}
@@ -163,8 +163,8 @@ func (ts *ServiceTestSuite) TestService_GetProfile() {
 		assert.Equal(ts.T(), tt.wantID, p.ID)
 
 		if tt.wantErr == nil {
-			assert.Equal(ts.T(), ts.user.createdAt, p.Joined)
-			assert.Equal(ts.T(), ts.user.lastSeen, p.LastSeen)
+			assert.Equal(ts.T(), ts.user.CreatedAt, p.Joined)
+			assert.Equal(ts.T(), ts.user.LastSeen, p.LastSeen)
 		}
 	}
 }
@@ -185,7 +185,7 @@ func (ts *ServiceTestSuite) TestService_UpdateLastSeen() {
 		assert.Equal(ts.T(), tt.wantErr, err)
 
 		if tt.wantLS {
-			assert.Equal(ts.T(), tt.wantLS, ts.user.lastSeen.After(now))
+			assert.Equal(ts.T(), tt.wantLS, ts.user.LastSeen.After(now))
 		}
 	}
 }
@@ -195,8 +195,8 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 	tempUser := *ts.user
 	tempUser.ID = nextID()
 	origUN := "newUsername"
-	tempUser.username = origUN
-	bio := tempUser.bio
+	tempUser.Username = origUN
+	bio := tempUser.Bio
 	err := ts.svc.users.Store(&tempUser)
 	assert.Nil(ts.T(), err)
 
@@ -233,13 +233,13 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 		assert.Equal(ts.T(), tt.wantErr, err)
 
 		if err == nil {
-			assert.Equal(ts.T(), tt.wantUN, tempUser.username)
-			assert.Equal(ts.T(), tt.wantBio, tempUser.bio)
+			assert.Equal(ts.T(), tt.wantUN, tempUser.Username)
+			assert.Equal(ts.T(), tt.wantBio, tempUser.Bio)
 		}
 
 		// reset
-		tempUser.username = origUN
-		tempUser.bio = bio
+		tempUser.Username = origUN
+		tempUser.Bio = bio
 	}
 
 	_ = ts.svc.users.Delete(tempUser.ID)
@@ -259,9 +259,9 @@ func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
 		{id: "invalid", wantErr: ErrInvalidID},
 		{id: nextID(), wantErr: ErrInvalidUsername},
 		{id: nextID(), username: "nonexistent", wantErr: ErrNotFound},
-		{id: u1.ID, username: u1.username, wantErr: ErrCantFollowSelf},
-		{id: u1.ID, username: u2.username, wantErr: nil, wantFollow: true, wantLen: 1},
-		{id: u1.ID, username: u2.username, wantErr: ErrAlreadyFollowing, wantFollow: true, wantLen: 1},
+		{id: u1.ID, username: u1.Username, wantErr: ErrCantFollowSelf},
+		{id: u1.ID, username: u2.Username, wantErr: nil, wantFollow: true, wantLen: 1},
+		{id: u1.ID, username: u2.Username, wantErr: ErrAlreadyFollowing, wantFollow: true, wantLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -293,9 +293,9 @@ func (ts *ServiceTestSuite) TestRemoveRelationshipFor() {
 		{id: "invalid", wantErr: ErrInvalidID},
 		{id: nextID(), wantErr: ErrInvalidUsername},
 		{id: nextID(), username: "nonexistent", wantErr: ErrNotFound},
-		{id: u1.ID, username: u1.username, wantErr: ErrCantUnFollowSelf},
-		{id: u1.ID, username: u2.username, wantErr: nil},
-		{id: u1.ID, username: u2.username, wantErr: ErrNotFollowing},
+		{id: u1.ID, username: u1.Username, wantErr: ErrCantUnFollowSelf},
+		{id: u1.ID, username: u2.Username, wantErr: nil},
+		{id: u1.ID, username: u2.Username, wantErr: ErrNotFollowing},
 	}
 
 	for _, tt := range tests {
@@ -329,8 +329,8 @@ func (ts *ServiceTestSuite) TestRelationships() {
 		{wantErr: ErrInvalidUsername},
 		{username: "nonexistent", wantErr: ErrNotFound},
 		{username: ts.req.Username, wantErr: nil},
-		{username: u1.username, wantErr: nil, wantFriendsCount: 1},
-		{username: u2.username, wantErr: nil, wantFollowersCount: 1},
+		{username: u1.Username, wantErr: nil, wantFriendsCount: 1},
+		{username: u2.Username, wantErr: nil, wantFollowersCount: 1},
 	}
 
 	for _, tt := range tests {

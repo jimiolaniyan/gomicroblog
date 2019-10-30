@@ -14,18 +14,6 @@ type mongoUserRepository struct {
 	collection *mongo.Collection
 }
 
-type dbUser struct {
-	ID        ID `bson:"_id"`
-	Username  string
-	Password  string
-	Email     string
-	CreatedAt time.Time
-	LastSeen  time.Time
-	Bio       string
-	Friends   []ID
-	Followers []ID
-}
-
 func NewMongoUserRepository(c *mongo.Collection) Repository {
 	return &mongoUserRepository{collection: c}
 }
@@ -46,8 +34,7 @@ func (m *mongoUserRepository) Update(u *User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	dbu := dbUserFromUser(u)
-	_, err := m.collection.ReplaceOne(ctx, bson.M{"_id": dbu.ID}, dbu)
+	_, err := m.collection.ReplaceOne(ctx, bson.M{"_id": u.ID}, u)
 	return err
 }
 
@@ -55,8 +42,7 @@ func (m *mongoUserRepository) Store(u *User) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	dbu := dbUserFromUser(u)
-	_, err := m.collection.InsertOne(ctx, &dbu)
+	_, err := m.collection.InsertOne(ctx, &u)
 	return err
 }
 
@@ -80,19 +66,19 @@ func (m *mongoUserRepository) FindByIDs(ids []ID) ([]User, error) {
 	}
 
 	for cursor.Next(ctx) {
-		var u dbUser
+		var u User
 		err := cursor.Decode(&u)
 		if err != nil {
 			return friends, err
 		}
 
-		friends = append(friends, userFromDBUser(u))
+		friends = append(friends, u)
 	}
 	return friends, nil
 }
 
 func (m *mongoUserRepository) findUserBy(key string, val string) (*User, error) {
-	var u dbUser
+	var u User
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -106,16 +92,7 @@ func (m *mongoUserRepository) findUserBy(key string, val string) (*User, error) 
 		return nil, err
 	}
 
-	nU := userFromDBUser(u)
-	return &nU, nil
-}
-
-func dbUserFromUser(u *User) dbUser {
-	return dbUser{u.ID, u.username, u.password, u.email, u.createdAt, u.lastSeen, u.bio, u.Friends, u.Followers}
-}
-
-func userFromDBUser(u dbUser) User {
-	return User{u.ID, u.Username, u.Password, u.Email, u.CreatedAt, u.LastSeen, u.Bio, u.Friends, u.Followers}
+	return &u, nil
 }
 
 type mongoPostRepository struct {

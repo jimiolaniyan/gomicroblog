@@ -10,7 +10,7 @@ import (
 func duplicateUser(s service, u User, username string) *User {
 	u1 := u
 	u1.ID = nextID()
-	u1.username = username
+	u1.Username = username
 
 	_ = s.users.Store(&u1)
 

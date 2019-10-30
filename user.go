@@ -25,13 +25,13 @@ type ID string
 //  and email to a credentials value object
 //  as part of an auth service
 type User struct {
-	ID        ID
-	username  string
-	password  string
-	email     string
-	createdAt time.Time
-	lastSeen  time.Time
-	bio       string
+	ID        ID `bson:"_id"`
+	Username  string
+	Password  string
+	Email     string
+	CreatedAt time.Time
+	LastSeen  time.Time
+	Bio       string
 	Friends   []ID
 	Followers []ID
 }
@@ -90,7 +90,7 @@ func NewUser(username, email string) (*User, error) {
 		return nil, err
 	}
 
-	return &User{username: username, email: email}, nil
+	return &User{Username: username, Email: email}, nil
 }
 
 func validateArgs(username string, email string) error {

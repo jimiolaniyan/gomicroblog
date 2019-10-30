@@ -21,7 +21,7 @@ func (repo *userRepository) FindByID(id ID) (*User, error) {
 
 func (repo *userRepository) FindByEmail(email string) (*User, error) {
 	for _, v := range repo.users {
-		if v.email == email {
+		if v.Email == email {
 			return v, nil
 		}
 	}
@@ -35,7 +35,7 @@ func (repo *userRepository) Store(user *User) error {
 
 func (repo *userRepository) FindByName(username string) (*User, error) {
 	for _, v := range repo.users {
-		if v.username == username {
+		if v.Username == username {
 			return v, nil
 		}
 	}

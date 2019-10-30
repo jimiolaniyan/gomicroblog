@@ -124,12 +124,12 @@ func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
 
 	user.ID = nextID()
 	if hash, err := hashPassword(p); err == nil {
-		user.password = hash
+		user.Password = hash
 	}
 
 	now := time.Now().UTC()
-	user.createdAt = now
-	user.lastSeen = now
+	user.CreatedAt = now
+	user.LastSeen = now
 	if err = svc.users.Store(user); err != nil {
 		return "", fmt.Errorf("error saving user: %s ", err)
 	}
@@ -147,7 +147,7 @@ func (svc *service) ValidateUser(req validateUserRequest) (ID, error) {
 		return "", ErrInvalidCredentials
 	}
 
-	if !checkPasswordHash(user.password, req.Password) {
+	if !checkPasswordHash(user.Password, req.Password) {
 		return "", ErrInvalidCredentials
 	}
 
@@ -220,10 +220,10 @@ func (svc *service) GetProfile(username string) (Profile, error) {
 	return Profile{
 		ID:       user.ID,
 		Username: username,
-		Avatar:   avatar(user.email),
-		Bio:      user.bio,
-		Joined:   user.createdAt,
-		LastSeen: user.lastSeen,
+		Avatar:   avatar(user.Email),
+		Bio:      user.Bio,
+		Joined:   user.CreatedAt,
+		LastSeen: user.LastSeen,
 		Relationships: Relationships{
 			Followers: len(user.Followers),
 			Friends:   len(user.Friends),
@@ -246,7 +246,7 @@ func (svc *service) EditProfile(id ID, req editProfileRequest) error {
 		return ErrNotFound
 	}
 
-	if req.Username != nil && *req.Username != user.username {
+	if req.Username != nil && *req.Username != user.Username {
 		if err := svc.updateUsername(req.Username, user); err != nil {
 			return err
 		}
@@ -275,7 +275,7 @@ func (svc *service) UpdateLastSeen(id ID) error {
 		return ErrNotFound
 	}
 
-	user.lastSeen = time.Now().UTC()
+	user.LastSeen = time.Now().UTC()
 	err = svc.users.Update(user)
 	if err != nil {
 		return fmt.Errorf("error updating last seen: %s", err.Error())
@@ -289,7 +289,7 @@ func (svc *service) CreateRelationshipFor(id ID, username string) error {
 		return err
 	}
 
-	if u1.username == username {
+	if u1.Username == username {
 		return ErrCantFollowSelf
 	}
 
@@ -316,7 +316,7 @@ func (svc *service) RemoveRelationshipFor(id ID, username string) error {
 		return err
 	}
 
-	if u1.username == username {
+	if u1.Username == username {
 		return ErrCantUnFollowSelf
 	}
 
@@ -427,10 +427,10 @@ func buildUserInfosFromUsers(users []User) []UserInfo {
 	for _, user := range users {
 		infos = append(infos, UserInfo{
 			ID:       user.ID,
-			Username: user.username,
-			Avatar:   avatar(user.email),
-			Bio:      user.bio,
-			Joined:   user.createdAt,
+			Username: user.Username,
+			Avatar:   avatar(user.Email),
+			Bio:      user.Bio,
+			Joined:   user.CreatedAt,
 		})
 	}
 	return infos
@@ -444,7 +444,7 @@ func (svc *service) updateUsername(username *string, user *User) error {
 	if user, _ := svc.users.FindByName(u); user != nil {
 		return ErrExistingUsername
 	}
-	user.username = u
+	user.Username = u
 	return nil
 }
 
@@ -453,7 +453,7 @@ func updateBio(bio *string, user *User) error {
 	if len(b) > 140 {
 		return ErrBioTooLong
 	}
-	user.bio = b
+	user.Bio = b
 	return nil
 }
 
@@ -467,8 +467,8 @@ func buildPostResponses(posts []*Post, user *User) []postResponse {
 			Timestamp: p.Timestamp,
 			Author: authorResponse{
 				UserID:   user.ID,
-				Username: user.username,
-				Avatar:   avatar(user.email),
+				Username: user.Username,
+				Avatar:   avatar(user.Email),
 			},
 		}
 
