@@ -10,7 +10,8 @@ import (
 func TestService_RegisterAccount(t *testing.T) {
 	now := time.Now().UTC()
 	accounts := NewAccountRepository()
-	svc := NewService(accounts)
+	spy := &accountEventsSpy{}
+	svc := NewService(accounts, spy)
 
 	tests := []struct {
 		req                            registerAccountRequest
@@ -32,8 +33,21 @@ func TestService_RegisterAccount(t *testing.T) {
 		acc, err := accounts.FindByID(id)
 		if tt.wantAcc {
 			assert.NoError(t, err)
+			assert.Equal(t, spy.id, string(acc.ID))
+			assert.Equal(t, spy.username, acc.Credentials.Username)
+			assert.Equal(t, spy.email, acc.Credentials.Email)
 			assert.Equal(t, tt.wantCreatedAt, acc.CreatedAt.After(now))
 			assert.True(t, hashMatchesPassword(acc.Credentials.Password, "password"))
 		}
 	}
+}
+
+type accountEventsSpy struct {
+	id, username, email string
+}
+
+func (a *accountEventsSpy) AccountCreated(accID string, username string, email string) {
+	a.id = accID
+	a.username = username
+	a.email = email
 }

@@ -7,10 +7,11 @@ import (
 
 type service struct {
 	accounts Repository
+	events   Events
 }
 
-func NewService(accounts Repository) Service {
-	return &service{accounts: accounts}
+func NewService(accounts Repository, subscriber Events) Service {
+	return &service{accounts: accounts, events: subscriber}
 }
 
 func (svc *service) RegisterAccount(r registerAccountRequest) (ID, error) {
@@ -40,6 +41,8 @@ func (svc *service) RegisterAccount(r registerAccountRequest) (ID, error) {
 	if err = svc.accounts.Store(acc); err != nil {
 		return "", fmt.Errorf("error saving user: %s ", err)
 	}
+
+	svc.events.AccountCreated(string(acc.ID), acc.Credentials.Username, acc.Credentials.Email)
 
 	return acc.ID, nil
 }
