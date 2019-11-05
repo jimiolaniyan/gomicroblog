@@ -14,25 +14,25 @@ func (repo *accountRepository) Store(acc *Account) error {
 }
 
 func (repo *accountRepository) FindByID(id ID) (*Account, error) {
-	if u, ok := repo.accounts[id]; ok {
-		return u, nil
+	if a, ok := repo.accounts[id]; ok {
+		return a, nil
 	}
 	return nil, ErrNotFound
 }
 
 func (repo *accountRepository) FindByName(username string) (*Account, error) {
-	for _, v := range repo.accounts {
-		if v.Credentials.Username == username {
-			return v, nil
+	for _, a := range repo.accounts {
+		if a.Credentials.Username == username {
+			return a, nil
 		}
 	}
 	return nil, ErrNotFound
 }
 
 func (repo *accountRepository) FindByEmail(email string) (*Account, error) {
-	for _, v := range repo.accounts {
-		if v.Credentials.Email == email {
-			return v, nil
+	for _, a := range repo.accounts {
+		if a.Credentials.Email == email {
+			return a, nil
 		}
 	}
 	return nil, ErrNotFound

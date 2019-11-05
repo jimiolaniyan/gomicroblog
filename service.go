@@ -483,14 +483,14 @@ func avatar(email string) string {
 	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?d=identicon", digest)
 }
 
-type accountCreatedSubscriber struct {
+type accountCreatedHandler struct {
 	UserService Service
 }
 
-func (a accountCreatedSubscriber) AccountCreated(id string, username string, email string) {
+func (a accountCreatedHandler) AccountCreated(id string, username string, email string) {
 	a.UserService.CreateProfile(id, username, email)
 }
 
-func NewAccountCreatedSubscriber(s Service) auth.Events {
-	return accountCreatedSubscriber{UserService: s}
+func NewAccountCreatedHandler(s Service) auth.Events {
+	return accountCreatedHandler{UserService: s}
 }

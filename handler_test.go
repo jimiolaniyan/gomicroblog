@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jimiolaniyan/gomicroblog/auth"
+
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -166,6 +168,27 @@ func (hs *HandlerTestSuite) TestRegisterNewUserHandler() {
 		assert.Equal(hs.T(), w.Header().Get("Content-Type"), "application/json")
 		assert.True(hs.T(), strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
 	}
+}
+
+func (hs *HandlerTestSuite) TestAccountCreatedHandler() {
+	req := `{"username": "u", "email": "e@m.com", "password": "password"}`
+	r, _ := http.NewRequest(http.MethodPost, "/auth/v1/accounts", strings.NewReader(req))
+
+	w := httptest.NewRecorder()
+	handler := http.NewServeMux()
+	svc := auth.NewService(auth.NewAccountRepository(), NewAccountCreatedHandler(hs.svc))
+	handler.Handle("/auth/v1/accounts", auth.RegisterAccountHandler(svc))
+	handler.ServeHTTP(w, r)
+
+	var res struct {
+		ID ID `json:"id"`
+	}
+
+	_ = json.NewDecoder(w.Body).Decode(&res)
+
+	u, _ := hs.users.FindByID(res.ID)
+	assert.NotNil(hs.T(), u)
+	assert.Equal(hs.T(), u.ID, res.ID)
 }
 
 func (hs *HandlerTestSuite) TestLoginHandler() {
