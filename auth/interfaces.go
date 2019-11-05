@@ -18,3 +18,8 @@ type Repository interface {
 type registerAccountRequest struct {
 	Username, Email, Password string
 }
+
+type registerAccountResponse struct {
+	ID  ID    `json:"id,omitempty"`
+	Err error `json:"error,omitempty"`
+}

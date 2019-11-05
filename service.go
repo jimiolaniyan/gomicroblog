@@ -7,10 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jimiolaniyan/gomicroblog/auth"
+
 	"github.com/rs/xid"
 )
 
 type Service interface {
+	CreateProfile(id, username, email string)
 	RegisterNewUser(req registerUserRequest) (ID, error)  //auth
 	ValidateUser(req validateUserRequest) (ID, error)     //auth
 	CreatePost(id ID, body string) (PostID, error)        //messaging
@@ -103,6 +106,12 @@ type UserInfo struct {
 
 func NewService(users Repository, posts PostRepository) Service {
 	return &service{users: users, posts: posts}
+}
+
+func (svc *service) CreateProfile(id string, username string, email string) {
+	now := time.Now().UTC()
+	u := User{ID: ID(id), Username: username, Email: email, CreatedAt: now, LastSeen: now}
+	_ = svc.users.Store(&u)
 }
 
 func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
@@ -472,4 +481,16 @@ func buildPostResponses(posts []*Post, user *User) []postResponse {
 func avatar(email string) string {
 	digest := fmt.Sprintf("%x", md5.Sum([]byte(email)))
 	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?d=identicon", digest)
+}
+
+type accountCreatedSubscriber struct {
+	UserService Service
+}
+
+func (a accountCreatedSubscriber) AccountCreated(id string, username string, email string) {
+	a.UserService.CreateProfile(id, username, email)
+}
+
+func NewAccountCreatedSubscriber(s Service) auth.Events {
+	return accountCreatedSubscriber{UserService: s}
 }

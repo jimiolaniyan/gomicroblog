@@ -1,0 +1,61 @@
+package auth
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+)
+
+func RegisterAccountHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, err := decodeRegisterAccountRequest(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		id, err := svc.RegisterAccount(req)
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+
+		loc := strings.Join(strings.Split(r.URL.Path, "/")[0:4], "/")
+
+		w.Header().Set("Location", fmt.Sprintf("%s/%s", loc, id))
+		w.WriteHeader(http.StatusCreated)
+		if err := json.NewEncoder(w).Encode(registerAccountResponse{ID: id}); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+}
+
+func encodeError(err error, w http.ResponseWriter) {
+	switch err {
+	case ErrNotFound:
+		w.WriteHeader(http.StatusNotFound)
+	case ErrExistingUsername, ErrExistingEmail:
+		w.WriteHeader(http.StatusConflict)
+	case ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername:
+		w.WriteHeader(http.StatusUnprocessableEntity)
+	default:
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		"error": err.Error(),
+	}); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func decodeRegisterAccountRequest(body io.ReadCloser) (registerAccountRequest, error) {
+	req := registerAccountRequest{}
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return registerAccountRequest{}, err
+	}
+
+	return req, nil
+}
