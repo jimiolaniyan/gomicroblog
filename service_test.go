@@ -1,7 +1,6 @@
 package blog
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -11,10 +10,10 @@ import (
 
 type ServiceTestSuite struct {
 	suite.Suite
-	svc    service
-	req    registerUserRequest
-	userID ID
-	user   *User
+	svc             service
+	username, email string
+	userID          ID
+	user            *User
 }
 
 func (ts *ServiceTestSuite) TearDownTest() {
@@ -23,46 +22,14 @@ func (ts *ServiceTestSuite) TearDownTest() {
 
 func (ts *ServiceTestSuite) SetupSuite() {
 	ts.svc = service{users: NewUserRepository(), posts: NewPostRepository()}
-	ts.req = registerUserRequest{"username", "password", "a@b"}
+	ts.userID = nextID()
+	ts.username = "username"
+	ts.email = "a@b.con"
+	ts.svc.CreateProfile(string(ts.userID), ts.username, ts.email)
 
-	id, _ := ts.svc.RegisterNewUser(ts.req)
-	ts.userID = id
-
-	user, _ := ts.svc.users.FindByID(id)
-	ts.user = user
-}
-
-func (ts *ServiceTestSuite) TestService_RegisterNewUser() {
-	now := time.Now().UTC()
-
-	tests := []struct {
-		description                string
-		req                        *registerUserRequest
-		wantValidID, wantCreatedAt bool
-		wantLastSeen               bool
-		wantErr                    error
-	}{
-		{description: "ExistingUsername", req: &registerUserRequest{"username", "password1", "b@c"}, wantErr: ErrExistingUsername},
-		{description: "ExistingEmail", req: &registerUserRequest{"username2", "password1", "a@b"}, wantErr: ErrExistingEmail},
-		{description: "InvalidPassword", req: &registerUserRequest{"username2", "passwod", "b@c"}, wantErr: ErrInvalidPassword},
-		{description: "ValidCredentials", req: &registerUserRequest{"username2", "password", "b@c.com"}, wantValidID: true, wantCreatedAt: true, wantLastSeen: true, wantErr: nil},
-	}
-
-	for _, tt := range tests {
-		ts.Run(fmt.Sprintf("%s", tt.description), func() {
-			userID, err := ts.svc.RegisterNewUser(*tt.req)
-
-			assert.Equal(ts.T(), tt.wantErr, err)
-			assert.Equal(ts.T(), IsValidID(string(userID)), tt.wantValidID)
-
-			user, _ := ts.svc.users.FindByID(userID)
-			if user != nil {
-				assert.Equal(ts.T(), tt.wantCreatedAt, user.CreatedAt.After(now))
-				assert.Equal(ts.T(), tt.wantLastSeen, user.LastSeen.After(now))
-				assert.True(ts.T(), checkPasswordHash(user.Password, "password"))
-			}
-		})
-	}
+	u, _ := ts.svc.users.FindByID(ts.userID)
+	u.Password, _ = hashPassword("password")
+	ts.user = u
 }
 
 func (ts ServiceTestSuite) TestService_ValidateUser() {
@@ -129,7 +96,7 @@ func (ts *ServiceTestSuite) TestService_GetUserPosts() {
 	}{
 		{wantErr: ErrInvalidUsername},
 		{username: "void", wantErr: ErrNotFound},
-		{username: ts.req.Username, wantErr: nil, wantPostsLen: 1},
+		{username: ts.username, wantErr: nil, wantPostsLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -140,8 +107,8 @@ func (ts *ServiceTestSuite) TestService_GetUserPosts() {
 }
 
 func (ts *ServiceTestSuite) TestService_GetProfile() {
-	av := avatar(ts.req.Email)
-	u := ts.req.Username
+	av := avatar(ts.email)
+	u := ts.username
 
 	tests := []struct {
 		username           string
@@ -219,7 +186,7 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 		{req: emptyUsernameReq, wantErr: ErrInvalidID},
 		{id: nextID(), req: emptyUsernameReq, wantErr: ErrNotFound},
 		{id: tempUser.ID, req: emptyUsernameReq, wantErr: ErrInvalidUsername},
-		{id: tempUser.ID, req: editProfileRequest{Username: &ts.req.Username}, wantErr: ErrExistingUsername},
+		{id: tempUser.ID, req: editProfileRequest{Username: &ts.username}, wantErr: ErrExistingUsername},
 		{id: tempUser.ID, req: editProfileRequest{Username: &origUN}, wantErr: nil, wantUN: origUN},
 		{id: tempUser.ID, req: editProfileRequest{Username: &u}, wantErr: nil, wantUN: u, wantBio: bio},
 		{id: tempUser.ID, req: editProfileRequest{Bio: &longBio}, wantErr: ErrBioTooLong, wantBio: bio, wantUN: origUN},
@@ -328,7 +295,7 @@ func (ts *ServiceTestSuite) TestRelationships() {
 	}{
 		{wantErr: ErrInvalidUsername},
 		{username: "nonexistent", wantErr: ErrNotFound},
-		{username: ts.req.Username, wantErr: nil},
+		{username: ts.username, wantErr: nil},
 		{username: u1.Username, wantErr: nil, wantFriendsCount: 1},
 		{username: u2.Username, wantErr: nil, wantFollowersCount: 1},
 	}

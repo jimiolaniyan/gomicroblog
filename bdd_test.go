@@ -12,47 +12,31 @@ import (
 
 type BddTestSuite struct {
 	suite.Suite
-	svc    service
-	req    registerUserRequest
-	now    time.Time
-	userID ID
-	user   *User
+	svc                       service
+	username, password, email string
+	now                       time.Time
+	userID                    ID
+	user                      *User
 }
 
 func (bs *BddTestSuite) SetupSuite() {
 	bs.now = time.Now().UTC()
 	bs.svc = service{users: NewUserRepository(), posts: NewPostRepository()}
-	bs.req = registerUserRequest{"U", "password", "user@app.com"}
 
-	id, _ := bs.svc.RegisterNewUser(bs.req)
-	bs.userID = id
+	bs.userID = nextID()
+	bs.username = "U"
+	bs.email = "user@app.com"
 
-	user, _ := bs.svc.users.FindByID(id)
-	bs.user = user
+	bs.svc.CreateProfile(string(bs.userID), bs.username, bs.email)
+
+	u, _ := bs.svc.users.FindByID(bs.userID)
+	bs.password = "password"
+	u.Password, _ = hashPassword(bs.password)
+	bs.user = u
 }
 
 func (bs *BddTestSuite) TearDownTest() {
 	bs.svc.posts = NewPostRepository()
-}
-
-func (bs *BddTestSuite) TestRegisterNewUser() {
-	Convey("Given new user with username, email and password", bs.T(), func() {
-		req := registerUserRequest{"user", "password", "user@user.com"}
-
-		Convey("When user registers", func() {
-			userID, err := bs.svc.RegisterNewUser(req)
-
-			So(err, ShouldBeNil)
-
-			Convey("Then the created user has username", func() {
-				dbUser, err := bs.svc.users.FindByName(req.Username)
-
-				So(err, ShouldBeNil)
-				So(userID, ShouldEqual, dbUser.ID)
-			})
-		})
-
-	})
 }
 
 func (bs *BddTestSuite) TestLoginUser() {
@@ -60,8 +44,8 @@ func (bs *BddTestSuite) TestLoginUser() {
 	Convey("Given an existing U", bs.T(), func() {
 
 		Convey("When U provides correct credentials", func() {
-			req.Username = bs.req.Username
-			req.Password = bs.req.Password
+			req.Username = bs.username
+			req.Password = bs.password
 
 			Convey("And U does validation", func() {
 				userID, err := bs.svc.ValidateUser(req)
@@ -69,7 +53,7 @@ func (bs *BddTestSuite) TestLoginUser() {
 				So(IsValidID(string(userID)), ShouldEqual, true)
 
 				Convey("Then the U is successfully validated", func() {
-					dbUser, err := bs.svc.users.FindByName(bs.req.Username)
+					dbUser, err := bs.svc.users.FindByName(bs.username)
 					So(err, ShouldBeNil)
 					So(userID, ShouldEqual, dbUser.ID)
 				})
@@ -88,7 +72,7 @@ func (bs *BddTestSuite) TestPostCreation() {
 			So(IsValidID(string(postID)), ShouldBeTrue)
 
 			Convey("Then the user's posts will contain P", func() {
-				posts, _ := bs.svc.GetUserPosts(bs.req.Username)
+				posts, _ := bs.svc.GetUserPosts(bs.username)
 				p := &Post{}
 
 				for _, post := range posts {
@@ -109,7 +93,7 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 	Convey("Given a newly registered user U with no posts", bs.T(), func() {
 
 		Convey("When his profile is requested", func() {
-			profile, err := bs.svc.GetProfile(bs.req.Username)
+			profile, err := bs.svc.GetProfile(bs.username)
 			So(err, ShouldBeNil)
 			So(profile, ShouldNotBeNil)
 
@@ -117,7 +101,7 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 				expectedProfile := Profile{
 					ID:       bs.userID,
 					Username: "U",
-					Avatar:   avatar(bs.req.Email),
+					Avatar:   avatar(bs.email),
 					Bio:      "",
 					Joined:   profile.Joined,
 					LastSeen: profile.LastSeen,

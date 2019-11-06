@@ -34,7 +34,7 @@ type HandlerTestSuite struct {
 	suite.Suite
 	userID      ID
 	svc         Service
-	req         registerUserRequest
+	username    string
 	user        *User
 	users       Repository
 	containerID string
@@ -77,12 +77,16 @@ func (hs *HandlerTestSuite) SetupSuite() {
 
 	hs.users = users
 	hs.svc = NewService(users, posts)
-	hs.req = registerUserRequest{"user", "password", "a@b.com"}
 
-	id, _ := hs.svc.RegisterNewUser(hs.req)
+	id := nextID()
+	username := "user"
+	hs.svc.CreateProfile(string(id), username, "a@b.con")
+
+	hs.username = username
 	hs.userID = id
 
 	u, _ := users.FindByID(id)
+	u.Password, _ = hashPassword("password")
 	hs.user = u
 }
 
@@ -354,7 +358,7 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 		{req: `{}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
 		{req: `{"username": ""}`, id: sid, wantCode: S422, withCtx: true, wantErr: ErrInvalidUsername},
 		{req: fmt.Sprintf(`{"username": "%s"}`, username), id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
-		{req: fmt.Sprintf(`{"username": "%s"}`, hs.req.Username), id: sid, wantCode: http.StatusConflict, withCtx: true, wantErr: ErrExistingUsername},
+		{req: fmt.Sprintf(`{"username": "%s"}`, hs.username), id: sid, wantCode: http.StatusConflict, withCtx: true, wantErr: ErrExistingUsername},
 		{req: `{"username": "newName"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil, wantUsername: "newName", reset: true},
 		{req: `{"bio": ""}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
 		{req: fmt.Sprintf(`{"bio": "%s"}`, longBio), id: sid, wantCode: S422, withCtx: true, wantErr: ErrBioTooLong},
@@ -432,7 +436,7 @@ func (hs *HandlerTestSuite) TestCreateRelationshipHandler() {
 		{username: "  ", wantCode: http.StatusBadRequest, wantErr: errNil},
 		{username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
-		{username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantFollowSelf},
+		{username: hs.username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantFollowSelf},
 		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: errNil},
 		{username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrAlreadyFollowing},
 	}
@@ -481,7 +485,7 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 		{username: "  ", wantCode: http.StatusBadRequest, wantErr: errNil},
 		{username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
-		{username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantUnFollowSelf},
+		{username: hs.username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantUnFollowSelf},
 		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: errNil},
 		{username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrNotFollowing},
 	}
@@ -513,7 +517,7 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 func (hs *HandlerTestSuite) TestGetRelationships() {
 	u := "follower"
 	user := DuplicateUser(hs.users, *hs.user, u)
-	_ = hs.svc.CreateRelationshipFor(user.ID, hs.req.Username)
+	_ = hs.svc.CreateRelationshipFor(user.ID, hs.username)
 	_ = hs.svc.CreateRelationshipFor(hs.userID, u)
 
 	tests := []struct {
@@ -523,7 +527,7 @@ func (hs *HandlerTestSuite) TestGetRelationships() {
 
 		{username: "  ", wantCode: http.StatusBadRequest},
 		{username: "nonexistent", wantCode: http.StatusNotFound},
-		{username: hs.req.Username, wantCode: http.StatusOK, wantFLen: 1},
+		{username: hs.username, wantCode: http.StatusOK, wantFLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -640,7 +644,7 @@ func (hs *HandlerTestSuite) TestLastSeenMiddleware() {
 		assert.Equal(hs.T(), tt.wantCalled, called)
 
 		if tt.wantUpdatedLastSeen {
-			p, _ := hs.svc.GetProfile(hs.req.Username)
+			p, _ := hs.svc.GetProfile(hs.username)
 			assert.Equal(hs.T(), tt.wantUpdatedLastSeen, p.LastSeen.After(now))
 		}
 	}
