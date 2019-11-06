@@ -14,7 +14,6 @@ import (
 
 type Service interface {
 	CreateProfile(id, username, email string)
-	RegisterNewUser(req registerUserRequest) (ID, error)  //auth
 	ValidateUser(req validateUserRequest) (ID, error)     //auth
 	CreatePost(id ID, body string) (PostID, error)        //messaging
 	GetUserPosts(username string) ([]*Post, error)        //messaging
@@ -31,17 +30,6 @@ type Service interface {
 type service struct {
 	users Repository
 	posts PostRepository
-}
-
-type registerUserRequest struct {
-	Username string
-	Password string
-	Email    string
-}
-
-type registerUserResponse struct {
-	ID  ID    `json:"id,omitempty"`
-	Err error `json:"error,omitempty"`
 }
 
 type validateUserRequest struct {
@@ -112,38 +100,6 @@ func (svc *service) CreateProfile(id string, username string, email string) {
 	now := time.Now().UTC()
 	u := User{ID: ID(id), Username: username, Email: email, CreatedAt: now, LastSeen: now}
 	_ = svc.users.Store(&u)
-}
-
-func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
-	u := req.Username
-	e := req.Email
-	user, err := NewUser(u, e)
-	if err != nil {
-		return "", err
-	}
-
-	p := req.Password
-	if len(p) < 8 {
-		return "", ErrInvalidPassword
-	}
-
-	if _, err := verifyNotInUse(svc, u, e); err != nil {
-		return "", err
-	}
-
-	user.ID = nextID()
-	if hash, err := hashPassword(p); err == nil {
-		user.Password = hash
-	}
-
-	now := time.Now().UTC()
-	user.CreatedAt = now
-	user.LastSeen = now
-	if err = svc.users.Store(user); err != nil {
-		return "", fmt.Errorf("error saving user: %s ", err)
-	}
-
-	return user.ID, nil
 }
 
 func (svc *service) ValidateUser(req validateUserRequest) (ID, error) {

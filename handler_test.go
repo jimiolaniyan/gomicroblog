@@ -103,7 +103,6 @@ func (hs *HandlerTestSuite) TearDownSuite() {
 var errNil = errors.New("")
 
 func (hs *HandlerTestSuite) TestDecodeRequest() {
-	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
 	loginReq := `{"username": "jimi", "password": "password1"}`
 	createPostReq := `{"body": "a simple post"}`
 	u := "new"
@@ -113,7 +112,6 @@ func (hs *HandlerTestSuite) TestDecodeRequest() {
 		wantErr error
 		wantReq interface{}
 	}{
-		{registerReq, decodeRegisterUserRequest, nil, registerUserRequest{"jimi", "password1", "test@tester.test"}},
 		{loginReq, decodeValidateUserRequest, nil, validateUserRequest{"jimi", "password1"}},
 		{createPostReq, decodeCreatePostRequest, nil, createPostRequest{"a simple post"}},
 		{`{}`, decodeEditProfileRequest, nil, editProfileRequest{nil, nil}},
@@ -126,52 +124,6 @@ func (hs *HandlerTestSuite) TestDecodeRequest() {
 		req, err := tt.decoder(body)
 		assert.Equal(hs.T(), tt.wantErr, err)
 		assert.Equal(hs.T(), tt.wantReq, req)
-	}
-}
-
-func (hs *HandlerTestSuite) TestRegisterNewUserHandler() {
-	invalidUsernameReq := `{"username": "", "password": "pass"}`
-	invalidPassReq := `{"username": "username", "password": "pass", "email": "a@b.com"}`
-	invalidEmailReq := `{"username": "username", "password": "password", "email": "ab.com"}`
-	registerReq := `{"username":"jimi", "password":"password1", "email":"test@tester.test"}`
-	existingUserReq := `{"username": "jimi", "password": "password", "email": "a@b.com"}`
-	existingEmailReq := `{"username": "username", "password": "password", "email": "test@tester.test"}`
-
-	tests := []struct {
-		req          string
-		wantCode     int
-		wantID       bool
-		wantErr      error
-		wantLocation string
-	}{
-		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: errNil},
-		{req: invalidUsernameReq, wantCode: http.StatusUnprocessableEntity, wantErr: ErrInvalidUsername},
-		{req: invalidPassReq, wantCode: http.StatusUnprocessableEntity, wantErr: ErrInvalidPassword},
-		{req: invalidEmailReq, wantCode: http.StatusUnprocessableEntity, wantErr: ErrInvalidEmail},
-		{req: registerReq, wantCode: http.StatusCreated, wantID: true, wantErr: errNil, wantLocation: "/v1/users"},
-		{req: existingUserReq, wantCode: http.StatusConflict, wantErr: ErrExistingUsername},
-		{req: existingEmailReq, wantCode: http.StatusConflict, wantErr: ErrExistingEmail},
-	}
-
-	for _, tt := range tests {
-		r, _ := http.NewRequest(http.MethodPost, "/v1/users", strings.NewReader(tt.req))
-
-		w := httptest.NewRecorder()
-		handler := http.NewServeMux()
-		handler.Handle("/v1/users", RegisterUserHandler(hs.svc))
-		handler.ServeHTTP(w, r)
-
-		var res struct {
-			ID  ID     `json:"id,omitempty"`
-			Err string `json:"error,omitempty"`
-		}
-
-		_ = json.NewDecoder(w.Body).Decode(&res)
-		assert.Equal(hs.T(), tt.wantCode, w.Code)
-		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
-		assert.Equal(hs.T(), IsValidID(string(res.ID)), tt.wantID)
-		assert.Equal(hs.T(), w.Header().Get("Content-Type"), "application/json")
-		assert.True(hs.T(), strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
 	}
 }
 

@@ -21,28 +21,6 @@ const idKey = key("auth")
 
 var signingKey = []byte(os.Getenv("AUTH_SIGNING_KEY"))
 
-func RegisterUserHandler(svc Service) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, err := decodeRegisterUserRequest(r.Body)
-		w.Header().Set("Content-Type", "application/json")
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		id, err := svc.RegisterNewUser(req.(registerUserRequest))
-		if err != nil {
-			encodeError(err, w)
-			return
-		}
-		location := strings.Join(strings.Split(r.URL.Path, "/")[0:3], "/")
-		w.Header().Set("Location", fmt.Sprintf("%s/%s", location, id))
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(&registerUserResponse{ID: id}); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-	})
-}
-
 func LoginHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		req, err := decodeValidateUserRequest(r.Body)
@@ -318,15 +296,6 @@ func encodeError(err error, w http.ResponseWriter) {
 	}); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-}
-
-func decodeRegisterUserRequest(body io.ReadCloser) (interface{}, error) {
-	req := registerUserRequest{}
-	if err := json.NewDecoder(body).Decode(&req); err != nil {
-		return registerUserRequest{}, err
-	}
-
-	return req, nil
 }
 
 func decodeValidateUserRequest(body io.ReadCloser) (interface{}, error) {
