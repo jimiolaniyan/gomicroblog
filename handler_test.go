@@ -88,6 +88,7 @@ func (hs *HandlerTestSuite) SetupSuite() {
 	u, _ := users.FindByID(id)
 	u.Password, _ = hashPassword("password")
 	hs.user = u
+	_ = hs.users.Update(u)
 }
 
 func (hs *HandlerTestSuite) TearDownSuite() {

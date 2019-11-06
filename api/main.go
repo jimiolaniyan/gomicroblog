@@ -7,6 +7,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/jimiolaniyan/gomicroblog/auth"
+
 	"github.com/julienschmidt/httprouter"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -35,9 +37,10 @@ func main() {
 	p := client.Database(dbName).Collection("posts")
 
 	svc := NewService(NewMongoUserRepository(u), NewMongoPostRepository(p))
+	authSvc := auth.NewService(auth.NewAccountRepository(), NewAccountCreatedHandler(svc))
 
 	router := httprouter.New()
-	router.Handler(http.MethodPost, "/v1/users", RegisterUserHandler(svc))
+	router.Handler(http.MethodPost, "/auth/v1/accounts", auth.RegisterAccountHandler(authSvc))
 	router.Handler(http.MethodPost, "/v1/sessions", LoginHandler(svc))
 	router.Handler(http.MethodPost, "/v1/posts", RequireAuth(LastSeenMiddleware(CreatePostHandler(svc), svc)))
 	router.Handler(http.MethodGet, "/v1/users/:username", LastSeenMiddleware(GetProfileHandler(svc), svc))

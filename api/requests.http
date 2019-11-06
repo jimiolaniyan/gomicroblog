@@ -1,5 +1,5 @@
 # Register user
-POST http://{{host}}:{{port}}/v1/users
+POST http://{{host}}:{{port}}/auth/v1/accounts
 Content-Type: application/json
 
 {

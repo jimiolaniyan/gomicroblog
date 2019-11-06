@@ -21,9 +21,6 @@ type Repository interface {
 
 type ID string
 
-// TODO: consider moving username, password
-//  and email to a credentials value object
-//  as part of an auth service
 type User struct {
 	ID        ID `bson:"_id"`
 	Username  string
