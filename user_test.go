@@ -7,40 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHashPassword_ReturnsCorrectHash(t *testing.T) {
-	p := "password"
-	hash, err := hashPassword(p)
-
-	assert.Nil(t, err)
-	assert.True(t, checkPasswordHash(hash, p))
-}
-
-func TestNewUser(t *testing.T) {
-	u := &User{Username: "user", Email: "e@m.co"}
-
-	tests := []struct {
-		username, email string
-		wantErr         error
-		wantUser        *User
-	}{
-		{wantErr: ErrInvalidUsername},
-		{username: "username", wantErr: ErrInvalidEmail},
-		{username: "username", email: "email", wantErr: ErrInvalidEmail},
-		{username: "user", email: "e@m.co", wantUser: u},
-	}
-
-	for _, tt := range tests {
-		user, err := NewUser(tt.username, tt.email)
-		assert.Equal(t, tt.wantErr, err)
-		assert.Equal(t, tt.wantUser, user)
-
-		if user != nil {
-			assert.Equal(t, tt.wantUser.Friends, user.Friends)
-			assert.Equal(t, tt.wantUser.Followers, user.Followers)
-		}
-	}
-}
-
 func TestValidID(t *testing.T) {
 	tests := []struct {
 		id   string
@@ -61,10 +27,10 @@ func TestValidID(t *testing.T) {
 }
 
 func TestUser_FollowAndUnFollow(t *testing.T) {
-	u1, _ := NewUser("rand1", "rand1@r.co")
-	u2, _ := NewUser("rand2", "rand2@r.co")
-	u3, _ := NewUser("rand3", "rand3@r.co")
-	u4, _ := NewUser("rand4", "rand4@r.co")
+	u1 := &User{Username: "rand1", Email: "rand1@r.co"}
+	u2 := &User{Username: "rand2", Email: "rand2@r.co"}
+	u3 := &User{Username: "rand3", Email: "rand3@r.co"}
+	u4 := &User{Username: "rand4", Email: "rand4@r.co"}
 
 	u1.ID = nextID()
 	u2.ID = nextID()

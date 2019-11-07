@@ -12,11 +12,11 @@ import (
 
 type BddTestSuite struct {
 	suite.Suite
-	svc                       service
-	username, password, email string
-	now                       time.Time
-	userID                    ID
-	user                      *User
+	svc             service
+	username, email string
+	now             time.Time
+	userID          ID
+	user            *User
 }
 
 func (bs *BddTestSuite) SetupSuite() {
@@ -30,8 +30,6 @@ func (bs *BddTestSuite) SetupSuite() {
 	bs.svc.CreateProfile(string(bs.userID), bs.username, bs.email)
 
 	u, _ := bs.svc.users.FindByID(bs.userID)
-	bs.password = "password"
-	u.Password, _ = hashPassword(bs.password)
 	bs.user = u
 }
 

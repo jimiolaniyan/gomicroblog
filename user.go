@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/rs/xid"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type Repository interface {
@@ -24,7 +23,6 @@ type ID string
 type User struct {
 	ID        ID `bson:"_id"`
 	Username  string
-	Password  string
 	Email     string
 	CreatedAt time.Time
 	LastSeen  time.Time
@@ -34,19 +32,15 @@ type User struct {
 }
 
 var (
-	ErrInvalidID          = errors.New("invalid user id")
-	ErrInvalidUsername    = errors.New("invalid username")
-	ErrInvalidPassword    = errors.New("invalid password")
-	ErrInvalidEmail       = errors.New("invalid email address")
-	ErrNotFound           = errors.New("user not found")
-	ErrExistingUsername   = errors.New("username in use")
-	ErrExistingEmail      = errors.New("email in use")
-	ErrInvalidCredentials = errors.New("invalid username or password")
-	ErrBioTooLong         = errors.New("bio cannot be more than 140 characters")
-	ErrCantFollowSelf     = errors.New("can't follow yourself")
-	ErrCantUnFollowSelf   = errors.New("can't unfollow yourself")
-	ErrAlreadyFollowing   = errors.New("already following user")
-	ErrNotFollowing       = errors.New("not following user")
+	ErrInvalidID        = errors.New("invalid user id")
+	ErrInvalidUsername  = errors.New("invalid username")
+	ErrNotFound         = errors.New("user not found")
+	ErrExistingUsername = errors.New("username in use")
+	ErrBioTooLong       = errors.New("bio cannot be more than 140 characters")
+	ErrCantFollowSelf   = errors.New("can't follow yourself")
+	ErrCantUnFollowSelf = errors.New("can't unfollow yourself")
+	ErrAlreadyFollowing = errors.New("already following user")
+	ErrNotFollowing     = errors.New("not following user")
 )
 
 func (u *User) IsFollowing(u2 *User) bool {
@@ -91,26 +85,6 @@ func (u *User) UpdateBio(bio string) error {
 	return nil
 }
 
-func NewUser(username, email string) (*User, error) {
-	if err := validateArgs(username, email); err != nil {
-		return nil, err
-	}
-
-	return &User{Username: username, Email: email}, nil
-}
-
-func validateArgs(username string, email string) error {
-	if len(username) < 1 {
-		return ErrInvalidUsername
-	}
-
-	if !strings.Contains(email, "@") {
-		return ErrInvalidEmail
-	}
-
-	return nil
-}
-
 func nextID() ID {
 	return ID(xid.New().String())
 }
@@ -122,17 +96,4 @@ func IsValidID(id string) bool {
 		return false
 	}
 	return true
-}
-
-func hashPassword(password string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
-	if err != nil {
-		return "", errors.New("error hashing password")
-	}
-	return string(hash), nil
-}
-
-func checkPasswordHash(hash, password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
 }

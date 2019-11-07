@@ -28,7 +28,6 @@ func (ts *ServiceTestSuite) SetupSuite() {
 	ts.svc.CreateProfile(string(ts.userID), ts.username, ts.email)
 
 	u, _ := ts.svc.users.FindByID(ts.userID)
-	u.Password, _ = hashPassword("password")
 	ts.user = u
 }
 

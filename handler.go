@@ -257,15 +257,15 @@ func getJWTToken(id string) (string, error) {
 
 func encodeError(err error, w http.ResponseWriter) {
 	switch err {
-	case ErrInvalidCredentials, ErrInvalidID:
+	case ErrInvalidID:
 		w.WriteHeader(http.StatusUnauthorized)
 	case ErrCantFollowSelf, ErrCantUnFollowSelf:
 		w.WriteHeader(http.StatusForbidden)
 	case ErrNotFound:
 		w.WriteHeader(http.StatusNotFound)
-	case ErrExistingUsername, ErrExistingEmail, ErrAlreadyFollowing, ErrNotFollowing:
+	case ErrExistingUsername, ErrAlreadyFollowing, ErrNotFollowing:
 		w.WriteHeader(http.StatusConflict)
-	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername, ErrBioTooLong:
+	case ErrEmptyBody, ErrInvalidUsername, ErrBioTooLong:
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
