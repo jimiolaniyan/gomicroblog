@@ -5,8 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
+
+	"github.com/dgrijalva/jwt-go"
 )
+
+var signingKey = []byte(os.Getenv("AUTH_SIGNING_KEY"))
 
 func RegisterAccountHandler(svc Service) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -33,8 +38,37 @@ func RegisterAccountHandler(svc Service) http.Handler {
 	})
 }
 
+func LoginHandler(svc Service) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		req, err := decodeLoginRequest(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		id, err := svc.ValidateCredentials(req)
+		if err != nil {
+			encodeError(err, w)
+			return
+		}
+
+		tokenString, err := getJWTToken(string(id))
+		if err = json.NewEncoder(w).Encode(map[string]interface{}{"token": tokenString}); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+}
+
+func getJWTToken(id string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{Issuer: "auth", Subject: id})
+	return token.SignedString(signingKey)
+}
+
 func encodeError(err error, w http.ResponseWriter) {
 	switch err {
+	case ErrInvalidCredentials:
+		w.WriteHeader(http.StatusUnauthorized)
 	case ErrNotFound:
 		w.WriteHeader(http.StatusNotFound)
 	case ErrExistingUsername, ErrExistingEmail:
@@ -56,6 +90,13 @@ func decodeRegisterAccountRequest(body io.ReadCloser) (registerAccountRequest, e
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
 		return registerAccountRequest{}, err
 	}
+	return req, nil
+}
 
+func decodeLoginRequest(body io.ReadCloser) (validateCredentialsRequest, error) {
+	req := validateCredentialsRequest{}
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return validateCredentialsRequest{}, err
+	}
 	return req, nil
 }
