@@ -97,9 +97,21 @@ func NewService(users Repository, posts PostRepository) Service {
 }
 
 func (svc *service) CreateProfile(id string, username string, email string) {
-	now := time.Now().UTC()
-	u := User{ID: ID(id), Username: username, Email: email, CreatedAt: now, LastSeen: now}
-	_ = svc.users.Store(&u)
+	if !svc.userExists(username, email) {
+		now := time.Now().UTC()
+		user := User{ID: ID(id), Username: username, Email: email, CreatedAt: now, LastSeen: now}
+		_ = svc.users.Store(&user)
+	}
+}
+
+func (svc *service) userExists(username string, email string) bool {
+	if u, _ := svc.users.FindByName(username); u != nil {
+		return true
+	}
+	if u, _ := svc.users.FindByEmail(email); u != nil {
+		return true
+	}
+	return false
 }
 
 func (svc *service) ValidateUser(req validateUserRequest) (ID, error) {

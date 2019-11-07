@@ -32,6 +32,29 @@ func (ts *ServiceTestSuite) SetupSuite() {
 	ts.user = u
 }
 
+func (ts *ServiceTestSuite) TestService_CreateProfile() {
+	id := nextID()
+	now := time.Now().UTC()
+	tests := []struct {
+		username, email string
+		wantCreatedAt   bool
+	}{
+		{username: ts.username},
+		{username: "new", email: ts.email},
+		{username: "new", email: "n@e.co", wantCreatedAt: true},
+	}
+
+	for _, tt := range tests {
+		ts.svc.CreateProfile(string(id), tt.username, tt.email)
+
+		user, _ := ts.svc.users.FindByID(id)
+
+		if user != nil {
+			assert.Equal(ts.T(), tt.wantCreatedAt, user.CreatedAt.After(now))
+		}
+	}
+}
+
 func (ts ServiceTestSuite) TestService_ValidateUser() {
 
 	tests := []struct {
