@@ -2,6 +2,7 @@ package auth
 
 type Service interface {
 	RegisterAccount(r registerAccountRequest) (ID, error)
+	ValidateCredentials(r validateCredentialsRequest) (ID, error)
 }
 
 type Events interface {
@@ -22,4 +23,8 @@ type registerAccountRequest struct {
 type registerAccountResponse struct {
 	ID  ID    `json:"id,omitempty"`
 	Err error `json:"error,omitempty"`
+}
+
+type validateCredentialsRequest struct {
+	Username, Password string
 }

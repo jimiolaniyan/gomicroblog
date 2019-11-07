@@ -34,7 +34,7 @@ func TestRegisterNewUserHandler(t *testing.T) {
 	existingEmailReq := `{"username": "u2", "email": "a@b.com", "password": "password"}`
 
 	accounts := NewAccountRepository()
-	b := &accountEventsSpy{}
+	b := &eventsSpy{}
 	svc := NewService(accounts, b)
 
 	tests := []struct {

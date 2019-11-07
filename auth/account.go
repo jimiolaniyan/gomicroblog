@@ -26,12 +26,13 @@ type Credentials struct {
 }
 
 var (
-	ErrInvalidUsername  = errors.New("invalid username")
-	ErrInvalidEmail     = errors.New("invalid email address")
-	ErrExistingUsername = errors.New("username in use")
-	ErrExistingEmail    = errors.New("email in use")
-	ErrInvalidPassword  = errors.New("invalid password")
-	ErrNotFound         = errors.New("account not found")
+	ErrInvalidUsername    = errors.New("invalid username")
+	ErrInvalidEmail       = errors.New("invalid email address")
+	ErrExistingUsername   = errors.New("username in use")
+	ErrExistingEmail      = errors.New("email in use")
+	ErrInvalidPassword    = errors.New("invalid password")
+	ErrNotFound           = errors.New("account not found")
+	ErrInvalidCredentials = errors.New("invalid username or password")
 )
 
 //NewAccount validates username and email and returns a new Account if

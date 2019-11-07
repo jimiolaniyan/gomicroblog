@@ -11,7 +11,7 @@ func TestRegisterNewUser(t *testing.T) {
 	convey.Convey("Given new user with username, email and password", t, func() {
 		req := registerAccountRequest{"user", "user@user.com", "password"}
 		accounts := NewAccountRepository()
-		svc := NewService(accounts, &accountEventsSpy{})
+		svc := NewService(accounts, &eventsSpy{})
 
 		convey.Convey("When user registers", func() {
 			userID, err := svc.RegisterAccount(req)

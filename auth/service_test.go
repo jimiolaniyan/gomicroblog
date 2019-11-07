@@ -4,13 +4,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/stretchr/testify/assert"
 )
+
+type ServiceTestSuite struct {
+	suite.Suite
+	svc      Service
+	accounts Repository
+	username string
+	id       ID
+}
 
 func TestService_RegisterAccount(t *testing.T) {
 	now := time.Now().UTC()
 	accounts := NewAccountRepository()
-	spy := &accountEventsSpy{}
+	spy := &eventsSpy{}
 	svc := NewService(accounts, spy)
 
 	tests := []struct {
@@ -42,12 +52,39 @@ func TestService_RegisterAccount(t *testing.T) {
 	}
 }
 
-type accountEventsSpy struct {
+type eventsSpy struct {
 	id, username, email string
 }
 
-func (a *accountEventsSpy) AccountCreated(accID string, username string, email string) {
-	a.id = accID
+func TestService_ValidateUser(t *testing.T) {
+	accounts := NewAccountRepository()
+	svc := NewService(accounts, &eventsSpy{})
+	_, _ = svc.RegisterAccount(registerAccountRequest{"test", "test@test.com", "password"})
+
+	tests := []struct {
+		username, password string
+		wantErr            error
+		wantValidID        bool
+	}{
+		{wantErr: ErrInvalidCredentials},
+		{username: "user", password: "pass", wantErr: ErrInvalidCredentials},
+		{username: "nonexistent", password: "password", wantErr: ErrInvalidCredentials},
+		{username: "test", password: "incorrect", wantErr: ErrInvalidCredentials},
+		{username: "test", password: "password", wantValidID: true},
+	}
+
+	for _, tt := range tests {
+		req := validateCredentialsRequest{tt.username, tt.password}
+
+		userID, err := svc.ValidateCredentials(req)
+
+		assert.Equal(t, tt.wantErr, err)
+		assert.Equal(t, tt.wantValidID, isValidID(string(userID)))
+	}
+}
+
+func (a *eventsSpy) AccountCreated(id string, username string, email string) {
+	a.id = id
 	a.username = username
 	a.email = email
 }

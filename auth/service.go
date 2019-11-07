@@ -47,6 +47,23 @@ func (svc *service) RegisterAccount(r registerAccountRequest) (ID, error) {
 	return acc.ID, nil
 }
 
+func (svc *service) ValidateCredentials(r validateCredentialsRequest) (ID, error) {
+	if r.Username == "" || len(r.Password) < 8 {
+		return "", ErrInvalidCredentials
+	}
+
+	acc, err := svc.accounts.FindByName(r.Username)
+	if err != nil {
+		return "", ErrInvalidCredentials
+	}
+
+	if !hashMatchesPassword(acc.Credentials.Password, r.Password) {
+		return "", ErrInvalidCredentials
+	}
+
+	return acc.ID, nil
+}
+
 func (svc *service) verifyNotInUse(username string, email string) (*Account, error) {
 	if u, err := svc.accounts.FindByName(username); u != nil && err == nil {
 		return nil, ErrExistingUsername
