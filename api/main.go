@@ -41,7 +41,7 @@ func main() {
 
 	router := httprouter.New()
 	router.Handler(http.MethodPost, "/auth/v1/accounts", auth.RegisterAccountHandler(authSvc))
-	router.Handler(http.MethodPost, "/v1/sessions", LoginHandler(svc))
+	router.Handler(http.MethodPost, "/auth/v1/sessions", auth.LoginHandler(authSvc))
 	router.Handler(http.MethodPost, "/v1/posts", RequireAuth(LastSeenMiddleware(CreatePostHandler(svc), svc)))
 	router.Handler(http.MethodGet, "/v1/users/:username", LastSeenMiddleware(GetProfileHandler(svc), svc))
 	router.Handler(http.MethodPatch, "/v1/users", RequireAuth(LastSeenMiddleware(EditProfileHandler(svc), svc)))

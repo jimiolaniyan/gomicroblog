@@ -104,12 +104,12 @@ func TestLoginHandler(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		req, err := http.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(tt.req))
+		req, err := http.NewRequest(http.MethodPost, "/auth/v1/sessions", strings.NewReader(tt.req))
 		assert.Nil(t, err)
 
 		w := httptest.NewRecorder()
 		mux := http.NewServeMux()
-		mux.Handle("/v1/sessions", LoginHandler(svc))
+		mux.Handle("/auth/v1/sessions", LoginHandler(svc))
 		mux.ServeHTTP(w, req)
 
 		var res struct {
