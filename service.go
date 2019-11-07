@@ -14,7 +14,6 @@ import (
 
 type Service interface {
 	CreateProfile(id, username, email string)
-	ValidateUser(req validateUserRequest) (ID, error)     //auth
 	CreatePost(id ID, body string) (PostID, error)        //messaging
 	GetUserPosts(username string) ([]*Post, error)        //messaging
 	GetProfile(username string) (Profile, error)          //profile
@@ -30,10 +29,6 @@ type Service interface {
 type service struct {
 	users Repository
 	posts PostRepository
-}
-
-type validateUserRequest struct {
-	Username, Password string
 }
 
 type createPostRequest struct {
@@ -112,33 +107,6 @@ func (svc *service) userExists(username string, email string) bool {
 		return true
 	}
 	return false
-}
-
-func (svc *service) ValidateUser(req validateUserRequest) (ID, error) {
-	if req.Username == "" || len(req.Password) < 8 {
-		return "", ErrInvalidCredentials
-	}
-
-	user, err := svc.users.FindByName(req.Username)
-	if err != nil {
-		return "", ErrInvalidCredentials
-	}
-
-	if !checkPasswordHash(user.Password, req.Password) {
-		return "", ErrInvalidCredentials
-	}
-
-	return user.ID, nil
-}
-
-func verifyNotInUse(svc *service, username string, email string) (*User, error) {
-	if u, _ := svc.users.FindByName(username); u != nil {
-		return nil, ErrExistingUsername
-	}
-	if u, _ := svc.users.FindByEmail(email); u != nil {
-		return nil, ErrExistingEmail
-	}
-	return nil, nil
 }
 
 func (svc *service) CreatePost(id ID, body string) (PostID, error) {

@@ -21,27 +21,6 @@ const idKey = key("auth")
 
 var signingKey = []byte(os.Getenv("AUTH_SIGNING_KEY"))
 
-func LoginHandler(svc Service) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, err := decodeValidateUserRequest(r.Body)
-		w.Header().Set("Content-Type", "application/json")
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		userID, err := svc.ValidateUser(req.(validateUserRequest))
-		if err != nil {
-			encodeError(err, w)
-			return
-		}
-
-		tokenString, err := getJWTToken(string(userID))
-		if err = json.NewEncoder(w).Encode(map[string]interface{}{"token": tokenString}); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-	})
-}
-
 var ErrEmptyContext = errors.New("could not get user id from context")
 
 func CreatePostHandler(svc Service) http.Handler {
@@ -296,14 +275,6 @@ func encodeError(err error, w http.ResponseWriter) {
 	}); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-}
-
-func decodeValidateUserRequest(body io.ReadCloser) (interface{}, error) {
-	req := validateUserRequest{}
-	if err := json.NewDecoder(body).Decode(&req); err != nil {
-		return validateUserRequest{}, err
-	}
-	return req, nil
 }
 
 func decodeCreatePostRequest(body io.ReadCloser) (interface{}, error) {

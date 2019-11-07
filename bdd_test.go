@@ -39,29 +39,6 @@ func (bs *BddTestSuite) TearDownTest() {
 	bs.svc.posts = NewPostRepository()
 }
 
-func (bs *BddTestSuite) TestLoginUser() {
-	var req validateUserRequest
-	Convey("Given an existing U", bs.T(), func() {
-
-		Convey("When U provides correct credentials", func() {
-			req.Username = bs.username
-			req.Password = bs.password
-
-			Convey("And U does validation", func() {
-				userID, err := bs.svc.ValidateUser(req)
-				So(err, ShouldBeNil)
-				So(IsValidID(string(userID)), ShouldEqual, true)
-
-				Convey("Then the U is successfully validated", func() {
-					dbUser, err := bs.svc.users.FindByName(bs.username)
-					So(err, ShouldBeNil)
-					So(userID, ShouldEqual, dbUser.ID)
-				})
-			})
-		})
-	})
-}
-
 func (bs *BddTestSuite) TestPostCreation() {
 	Convey("Given a registered user U with a new post P", bs.T(), func() {
 		body := "P"

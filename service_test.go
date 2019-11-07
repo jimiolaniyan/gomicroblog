@@ -55,30 +55,6 @@ func (ts *ServiceTestSuite) TestService_CreateProfile() {
 	}
 }
 
-func (ts ServiceTestSuite) TestService_ValidateUser() {
-
-	tests := []struct {
-		username, password string
-		wantErr            error
-		wantValidID        bool
-	}{
-		{"", "", ErrInvalidCredentials, false},
-		{"user", "jaiu", ErrInvalidCredentials, false},
-		{"nonexistent", "password", ErrInvalidCredentials, false},
-		{"username", "incorrect", ErrInvalidCredentials, false},
-		{"username", "password", nil, true},
-	}
-
-	for _, tt := range tests {
-		req := validateUserRequest{tt.username, tt.password}
-
-		userID, err := ts.svc.ValidateUser(req)
-
-		assert.Equal(ts.T(), tt.wantErr, err)
-		assert.Equal(ts.T(), tt.wantValidID, IsValidID(string(userID)))
-	}
-}
-
 func (ts *ServiceTestSuite) TestService_CreatePost() {
 	tests := []struct {
 		userID              ID

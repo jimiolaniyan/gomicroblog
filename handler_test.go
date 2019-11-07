@@ -2,12 +2,9 @@ package blog
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -102,31 +99,6 @@ func (hs *HandlerTestSuite) TearDownSuite() {
 
 var errNil = errors.New("")
 
-func (hs *HandlerTestSuite) TestDecodeRequest() {
-	loginReq := `{"username": "jimi", "password": "password1"}`
-	createPostReq := `{"body": "a simple post"}`
-	u := "new"
-	tests := []struct {
-		r       string
-		decoder func(closer io.ReadCloser) (interface{}, error)
-		wantErr error
-		wantReq interface{}
-	}{
-		{loginReq, decodeValidateUserRequest, nil, validateUserRequest{"jimi", "password1"}},
-		{createPostReq, decodeCreatePostRequest, nil, createPostRequest{"a simple post"}},
-		{`{}`, decodeEditProfileRequest, nil, editProfileRequest{nil, nil}},
-		{`{"username": "", "bio": ""}`, decodeEditProfileRequest, nil, editProfileRequest{new(string), new(string)}},
-		{`{"username": "new", "bio": "new"}`, decodeEditProfileRequest, nil, editProfileRequest{&u, &u}},
-	}
-
-	for _, tt := range tests {
-		body := ioutil.NopCloser(strings.NewReader(tt.r))
-		req, err := tt.decoder(body)
-		assert.Equal(hs.T(), tt.wantErr, err)
-		assert.Equal(hs.T(), tt.wantReq, req)
-	}
-}
-
 func (hs *HandlerTestSuite) TestAccountCreatedHandler() {
 	req := `{"username": "u", "email": "e@m.com", "password": "password"}`
 	r, _ := http.NewRequest(http.MethodPost, "/auth/v1/accounts", strings.NewReader(req))
@@ -146,46 +118,6 @@ func (hs *HandlerTestSuite) TestAccountCreatedHandler() {
 	u, _ := hs.users.FindByID(res.ID)
 	assert.NotNil(hs.T(), u)
 	assert.Equal(hs.T(), u.ID, res.ID)
-}
-
-func (hs *HandlerTestSuite) TestLoginHandler() {
-	validClaims := fmt.Sprintf("{\"iss\":\"auth\",\"sub\":\"%s\"}", hs.userID)
-	tests := []struct {
-		req                    string
-		wantCode, wantTokenLen int
-		wantClaims             string
-	}{
-		{req: `invalid request`, wantCode: http.StatusBadRequest, wantTokenLen: 1},
-		{req: `{"username": "nonexistent", "password": "password"}`, wantCode: http.StatusUnauthorized, wantTokenLen: 1},
-		{req: `{"username": "user", "password": "anInvalid"}`, wantCode: http.StatusUnauthorized, wantTokenLen: 1},
-		{req: `{"username": "user", "password": "password"}`, wantCode: http.StatusOK, wantTokenLen: 3, wantClaims: validClaims},
-	}
-
-	for _, tt := range tests {
-		req, err := http.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(tt.req))
-		assert.Nil(hs.T(), err)
-
-		w := httptest.NewRecorder()
-		mux := http.NewServeMux()
-		mux.Handle("/v1/sessions", LoginHandler(hs.svc))
-		mux.ServeHTTP(w, req)
-
-		var res struct {
-			Token string `json:"token,omitempty"`
-			Error string `json:"error,omitempty"`
-		}
-
-		_ = json.NewDecoder(w.Body).Decode(&res)
-		assert.Equal(hs.T(), tt.wantCode, w.Code)
-		parts := strings.Split(res.Token, ".")
-		assert.Equal(hs.T(), len(parts), tt.wantTokenLen)
-
-		if len(parts) > 2 {
-			claim, err := base64.RawStdEncoding.DecodeString(parts[1])
-			assert.Nil(hs.T(), err)
-			assert.Equal(hs.T(), tt.wantClaims, string(claim))
-		}
-	}
 }
 
 func (hs *HandlerTestSuite) TestCreatePostHandler() {
