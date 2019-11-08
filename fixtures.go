@@ -1,4 +1,4 @@
-package gomicroblog
+package blog
 
 import (
 	"bytes"
@@ -7,12 +7,12 @@ import (
 	"strings"
 )
 
-func duplicateUser(s service, u user, username string) *user {
+func DuplicateUser(r Repository, u User, username string) *User {
 	u1 := u
 	u1.ID = nextID()
-	u1.username = username
+	u1.Username = username
 
-	_ = s.users.Store(&u1)
+	_ = r.Store(&u1)
 
 	return &u1
 }

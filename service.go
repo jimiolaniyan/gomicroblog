@@ -1,4 +1,4 @@
-package gomicroblog
+package blog
 
 import (
 	"crypto/md5"
@@ -7,14 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jimiolaniyan/gomicroblog/auth"
+
 	"github.com/rs/xid"
 )
 
 type Service interface {
-	RegisterNewUser(req registerUserRequest) (ID, error)  //auth
-	ValidateUser(req validateUserRequest) (ID, error)     //auth
+	CreateProfile(id, username, email string)
 	CreatePost(id ID, body string) (PostID, error)        //messaging
-	GetUserPosts(username string) ([]*post, error)        //messaging
+	GetUserPosts(username string) ([]*Post, error)        //messaging
 	GetProfile(username string) (Profile, error)          //profile
 	UpdateLastSeen(id ID) error                           //profile
 	EditProfile(id ID, req editProfileRequest) error      //profile
@@ -28,21 +29,6 @@ type Service interface {
 type service struct {
 	users Repository
 	posts PostRepository
-}
-
-type registerUserRequest struct {
-	Username string
-	Password string
-	Email    string
-}
-
-type registerUserResponse struct {
-	ID  ID    `json:"id,omitempty"`
-	Err error `json:"error,omitempty"`
-}
-
-type validateUserRequest struct {
-	Username, Password string
 }
 
 type createPostRequest struct {
@@ -105,63 +91,22 @@ func NewService(users Repository, posts PostRepository) Service {
 	return &service{users: users, posts: posts}
 }
 
-func (svc *service) RegisterNewUser(req registerUserRequest) (ID, error) {
-	u := req.Username
-	e := req.Email
-	user, err := NewUser(u, e)
-	if err != nil {
-		return "", err
+func (svc *service) CreateProfile(id string, username string, email string) {
+	if !svc.userExists(username, email) {
+		now := time.Now().UTC()
+		user := User{ID: ID(id), Username: username, Email: email, CreatedAt: now, LastSeen: now}
+		_ = svc.users.Store(&user)
 	}
-
-	p := req.Password
-	if len(p) < 8 {
-		return "", ErrInvalidPassword
-	}
-
-	if _, err := verifyNotInUse(svc, u, e); err != nil {
-		return "", err
-	}
-
-	user.ID = nextID()
-	if hash, err := hashPassword(p); err == nil {
-		user.password = hash
-	}
-
-	now := time.Now().UTC()
-	user.createdAt = now
-	user.lastSeen = now
-	if err = svc.users.Store(user); err != nil {
-		return "", fmt.Errorf("error saving user: %s ", err)
-	}
-
-	return user.ID, nil
 }
 
-func (svc *service) ValidateUser(req validateUserRequest) (ID, error) {
-	if req.Username == "" || len(req.Password) < 8 {
-		return "", ErrInvalidCredentials
-	}
-
-	user, err := svc.users.FindByName(req.Username)
-	if err != nil {
-		return "", ErrInvalidCredentials
-	}
-
-	if !checkPasswordHash(user.password, req.Password) {
-		return "", ErrInvalidCredentials
-	}
-
-	return user.ID, nil
-}
-
-func verifyNotInUse(svc *service, username string, email string) (*user, error) {
+func (svc *service) userExists(username string, email string) bool {
 	if u, _ := svc.users.FindByName(username); u != nil {
-		return nil, ErrExistingUsername
+		return true
 	}
 	if u, _ := svc.users.FindByEmail(email); u != nil {
-		return nil, ErrExistingEmail
+		return true
 	}
-	return nil, nil
+	return false
 }
 
 func (svc *service) CreatePost(id ID, body string) (PostID, error) {
@@ -189,7 +134,7 @@ func (svc *service) CreatePost(id ID, body string) (PostID, error) {
 	return post.ID, nil
 }
 
-func (svc *service) GetUserPosts(username string) ([]*post, error) {
+func (svc *service) GetUserPosts(username string) ([]*Post, error) {
 	if username == "" {
 		return nil, ErrInvalidUsername
 	}
@@ -220,10 +165,10 @@ func (svc *service) GetProfile(username string) (Profile, error) {
 	return Profile{
 		ID:       user.ID,
 		Username: username,
-		Avatar:   avatar(user.email),
-		Bio:      user.bio,
-		Joined:   user.createdAt,
-		LastSeen: user.lastSeen,
+		Avatar:   avatar(user.Email),
+		Bio:      user.Bio,
+		Joined:   user.CreatedAt,
+		LastSeen: user.LastSeen,
 		Relationships: Relationships{
 			Followers: len(user.Followers),
 			Friends:   len(user.Friends),
@@ -246,14 +191,14 @@ func (svc *service) EditProfile(id ID, req editProfileRequest) error {
 		return ErrNotFound
 	}
 
-	if req.Username != nil && *req.Username != user.username {
+	if req.Username != nil && *req.Username != user.Username {
 		if err := svc.updateUsername(req.Username, user); err != nil {
 			return err
 		}
 	}
 
 	if req.Bio != nil {
-		if err := updateBio(req.Bio, user); err != nil {
+		if err := user.UpdateBio(*req.Bio); err != nil {
 			return err
 		}
 	}
@@ -275,7 +220,7 @@ func (svc *service) UpdateLastSeen(id ID) error {
 		return ErrNotFound
 	}
 
-	user.lastSeen = time.Now().UTC()
+	user.LastSeen = time.Now().UTC()
 	err = svc.users.Update(user)
 	if err != nil {
 		return fmt.Errorf("error updating last seen: %s", err.Error())
@@ -289,7 +234,7 @@ func (svc *service) CreateRelationshipFor(id ID, username string) error {
 		return err
 	}
 
-	if u1.username == username {
+	if u1.Username == username {
 		return ErrCantFollowSelf
 	}
 
@@ -316,7 +261,7 @@ func (svc *service) RemoveRelationshipFor(id ID, username string) error {
 		return err
 	}
 
-	if u1.username == username {
+	if u1.Username == username {
 		return ErrCantUnFollowSelf
 	}
 
@@ -389,7 +334,7 @@ func (svc *service) GetTimeline(id ID) ([]postResponse, error) {
 }
 
 // TODO refactor this to use get U1 and U2 separately
-func (svc *service) getU1U2(id ID, username string) (u1 *user, u2 *user, err error) {
+func (svc *service) getU1U2(id ID, username string) (u1 *User, u2 *User, err error) {
 	if !IsValidID(string(id)) {
 		return nil, nil, ErrInvalidID
 	}
@@ -411,7 +356,7 @@ func (svc *service) getU1U2(id ID, username string) (u1 *user, u2 *user, err err
 	return
 }
 
-func (svc *service) findUser(username string) (*user, error) {
+func (svc *service) findUser(username string) (*User, error) {
 	if username == "" {
 		return nil, ErrInvalidUsername
 	}
@@ -422,21 +367,21 @@ func (svc *service) findUser(username string) (*user, error) {
 	return user, nil
 }
 
-func buildUserInfosFromUsers(users []user) []UserInfo {
+func buildUserInfosFromUsers(users []User) []UserInfo {
 	var infos = []UserInfo{}
 	for _, user := range users {
 		infos = append(infos, UserInfo{
 			ID:       user.ID,
-			Username: user.username,
-			Avatar:   avatar(user.email),
-			Bio:      user.bio,
-			Joined:   user.createdAt,
+			Username: user.Username,
+			Avatar:   avatar(user.Email),
+			Bio:      user.Bio,
+			Joined:   user.CreatedAt,
 		})
 	}
 	return infos
 }
 
-func (svc *service) updateUsername(username *string, user *user) error {
+func (svc *service) updateUsername(username *string, user *User) error {
 	u := strings.TrimSpace(*username)
 	if u == "" {
 		return ErrInvalidUsername
@@ -444,20 +389,11 @@ func (svc *service) updateUsername(username *string, user *user) error {
 	if user, _ := svc.users.FindByName(u); user != nil {
 		return ErrExistingUsername
 	}
-	user.username = u
+	user.Username = u
 	return nil
 }
 
-func updateBio(bio *string, user *user) error {
-	b := strings.TrimSpace(*bio)
-	if len(b) > 140 {
-		return ErrBioTooLong
-	}
-	user.bio = b
-	return nil
-}
-
-func buildPostResponses(posts []*post, user *user) []postResponse {
+func buildPostResponses(posts []*Post, user *User) []postResponse {
 	var res = []postResponse{}
 
 	for _, p := range posts {
@@ -467,8 +403,8 @@ func buildPostResponses(posts []*post, user *user) []postResponse {
 			Timestamp: p.Timestamp,
 			Author: authorResponse{
 				UserID:   user.ID,
-				Username: user.username,
-				Avatar:   avatar(user.email),
+				Username: user.Username,
+				Avatar:   avatar(user.Email),
 			},
 		}
 
@@ -481,4 +417,16 @@ func buildPostResponses(posts []*post, user *user) []postResponse {
 func avatar(email string) string {
 	digest := fmt.Sprintf("%x", md5.Sum([]byte(email)))
 	return fmt.Sprintf("https://www.gravatar.com/avatar/%s?d=identicon", digest)
+}
+
+type accountCreatedHandler struct {
+	UserService Service
+}
+
+func (a accountCreatedHandler) AccountCreated(id string, username string, email string) {
+	a.UserService.CreateProfile(id, username, email)
+}
+
+func NewAccountCreatedHandler(s Service) auth.Events {
+	return accountCreatedHandler{UserService: s}
 }

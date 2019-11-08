@@ -1,4 +1,4 @@
-package gomicroblog
+package blog
 
 import (
 	"testing"
@@ -12,70 +12,29 @@ import (
 
 type BddTestSuite struct {
 	suite.Suite
-	svc    service
-	req    registerUserRequest
-	now    time.Time
-	userID ID
-	user   *user
+	svc             service
+	username, email string
+	now             time.Time
+	userID          ID
+	user            *User
 }
 
 func (bs *BddTestSuite) SetupSuite() {
 	bs.now = time.Now().UTC()
 	bs.svc = service{users: NewUserRepository(), posts: NewPostRepository()}
-	bs.req = registerUserRequest{"U", "password", "user@app.com"}
 
-	id, _ := bs.svc.RegisterNewUser(bs.req)
-	bs.userID = id
+	bs.userID = nextID()
+	bs.username = "U"
+	bs.email = "user@app.com"
 
-	user, _ := bs.svc.users.FindByID(id)
-	bs.user = user
+	bs.svc.CreateProfile(string(bs.userID), bs.username, bs.email)
+
+	u, _ := bs.svc.users.FindByID(bs.userID)
+	bs.user = u
 }
 
 func (bs *BddTestSuite) TearDownTest() {
 	bs.svc.posts = NewPostRepository()
-}
-
-func (bs *BddTestSuite) TestRegisterNewUser() {
-	Convey("Given new user with username, email and password", bs.T(), func() {
-		req := registerUserRequest{"user", "password", "user@user.com"}
-
-		Convey("When user registers", func() {
-			userID, err := bs.svc.RegisterNewUser(req)
-
-			So(err, ShouldBeNil)
-
-			Convey("Then the created user has username", func() {
-				dbUser, err := bs.svc.users.FindByName(req.Username)
-
-				So(err, ShouldBeNil)
-				So(userID, ShouldEqual, dbUser.ID)
-			})
-		})
-
-	})
-}
-
-func (bs *BddTestSuite) TestLoginUser() {
-	var req validateUserRequest
-	Convey("Given an existing U", bs.T(), func() {
-
-		Convey("When U provides correct credentials", func() {
-			req.Username = bs.req.Username
-			req.Password = bs.req.Password
-
-			Convey("And U does validation", func() {
-				userID, err := bs.svc.ValidateUser(req)
-				So(err, ShouldBeNil)
-				So(IsValidID(string(userID)), ShouldEqual, true)
-
-				Convey("Then the U is successfully validated", func() {
-					dbUser, err := bs.svc.users.FindByName(bs.req.Username)
-					So(err, ShouldBeNil)
-					So(userID, ShouldEqual, dbUser.ID)
-				})
-			})
-		})
-	})
 }
 
 func (bs *BddTestSuite) TestPostCreation() {
@@ -83,13 +42,13 @@ func (bs *BddTestSuite) TestPostCreation() {
 		body := "P"
 
 		Convey("When U creates P", func() {
-			postId, err := bs.svc.CreatePost(bs.userID, body)
+			postID, err := bs.svc.CreatePost(bs.userID, body)
 			So(err, ShouldBeNil)
-			So(IsValidID(string(postId)), ShouldBeTrue)
+			So(IsValidID(string(postID)), ShouldBeTrue)
 
 			Convey("Then the user's posts will contain P", func() {
-				posts, _ := bs.svc.GetUserPosts(bs.req.Username)
-				p := &post{}
+				posts, _ := bs.svc.GetUserPosts(bs.username)
+				p := &Post{}
 
 				for _, post := range posts {
 					if post.Author.UserID == bs.userID && post.Body == body {
@@ -98,7 +57,7 @@ func (bs *BddTestSuite) TestPostCreation() {
 				}
 
 				So(p, ShouldNotBeNil)
-				So(postId, ShouldEqual, p.ID)
+				So(postID, ShouldEqual, p.ID)
 				So(body, ShouldEqual, p.Body)
 			})
 		})
@@ -109,7 +68,7 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 	Convey("Given a newly registered user U with no posts", bs.T(), func() {
 
 		Convey("When his profile is requested", func() {
-			profile, err := bs.svc.GetProfile(bs.req.Username)
+			profile, err := bs.svc.GetProfile(bs.username)
 			So(err, ShouldBeNil)
 			So(profile, ShouldNotBeNil)
 
@@ -117,7 +76,7 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 				expectedProfile := Profile{
 					ID:       bs.userID,
 					Username: "U",
-					Avatar:   avatar(bs.req.Email),
+					Avatar:   avatar(bs.email),
 					Bio:      "",
 					Joined:   profile.Joined,
 					LastSeen: profile.LastSeen,
@@ -136,7 +95,7 @@ func (bs *BddTestSuite) TestProfileWithNoPosts() {
 
 func (bs *BddTestSuite) TestProfileWithPostsAndFriends() {
 	Convey("Given a returning user U1 with posts", bs.T(), func() {
-		u1 := duplicateUser(bs.svc, *bs.user, "fU1")
+		u1 := DuplicateUser(bs.svc.users, *bs.user, "fU1")
 
 		postIDs, ok := createPosts(u1.ID, bs.svc)
 		So(ok, ShouldBeTrue)
@@ -145,17 +104,17 @@ func (bs *BddTestSuite) TestProfileWithPostsAndFriends() {
 		So(err, ShouldBeNil)
 
 		Convey("With U1 and U2 following each other", func() {
-			u2 := duplicateUser(bs.svc, *bs.user, "fU2")
+			u2 := DuplicateUser(bs.svc.users, *bs.user, "fU2")
 			u1.Follow(u2)
 			u2.Follow(u1)
 			Convey("When his profile is requested", func() {
-				profile, err := bs.svc.GetProfile(u1.username)
+				profile, err := bs.svc.GetProfile(u1.Username)
 
 				So(err, ShouldBeNil)
 				So(profile, ShouldNotBeNil)
 
 				Convey("Then his profile contains his posts in reverse chronological order", func() {
-					ar := authorResponse{Username: u1.username, UserID: u1.ID, Avatar: avatar("user@app.com")}
+					ar := authorResponse{Username: u1.Username, UserID: u1.ID, Avatar: avatar("user@app.com")}
 					expected := Profile{
 						Relationships: Relationships{Followers: 1, Friends: 1},
 						Posts: []postResponse{
@@ -170,7 +129,7 @@ func (bs *BddTestSuite) TestProfileWithPostsAndFriends() {
 
 					Convey("Add his last seen is updated.", func() {
 						user, _ := bs.svc.users.FindByID(u1.ID)
-						So(profile.LastSeen, ShouldEqual, user.lastSeen)
+						So(profile.LastSeen, ShouldEqual, user.LastSeen)
 						So(profile.LastSeen.After(profile.Joined), ShouldBeTrue)
 
 						Reset(func() {
@@ -188,7 +147,7 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 	Convey("Given a returning user U", bs.T(), func() {
 		existingUser := *bs.user
 		existingUser.ID = nextID()
-		existingUser.username = "newUsername"
+		existingUser.Username = "newUsername"
 
 		err := bs.svc.users.Store(&existingUser)
 		assert.Nil(bs.T(), err)
@@ -201,7 +160,7 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 			So(err, ShouldBeNil)
 
 			Convey("Then his profile shows the updated information", func() {
-				profile, err := bs.svc.GetProfile(existingUser.username)
+				profile, err := bs.svc.GetProfile(existingUser.Username)
 
 				So(err, ShouldBeNil)
 				So(profile.Username, ShouldEqual, newU)
@@ -217,19 +176,19 @@ func (bs *BddTestSuite) TestEditUserProfile() {
 
 func (bs *BddTestSuite) TestRelationships_Create() {
 	Convey("Given two users U1 and U2 with no relationship", bs.T(), func() {
-		u1 := duplicateUser(bs.svc, *bs.user, "U1")
-		u2 := duplicateUser(bs.svc, *bs.user, "U2")
+		u1 := DuplicateUser(bs.svc.users, *bs.user, "U1")
+		u2 := DuplicateUser(bs.svc.users, *bs.user, "U2")
 
 		Convey("When U1 follows U2", func() {
 
-			err := bs.svc.CreateRelationshipFor(u1.ID, u2.username)
+			err := bs.svc.CreateRelationshipFor(u1.ID, u2.Username)
 			So(err, ShouldBeNil)
 
 			Convey("Then U1 is following U2", func() {
 				So(u1.IsFollowing(u2), ShouldBeTrue)
 
 				Convey("And U2 is in U1's friends list", func() {
-					friends, err := bs.svc.GetUserFriends(u1.username)
+					friends, err := bs.svc.GetUserFriends(u1.Username)
 
 					So(err, ShouldBeNil)
 
@@ -239,7 +198,7 @@ func (bs *BddTestSuite) TestRelationships_Create() {
 					So(userInfo, ShouldResemble, expectedUserInfo)
 
 					Convey("And U1 is in U2's followers list", func() {
-						followers, err := bs.svc.GetUserFollowers(u2.username)
+						followers, err := bs.svc.GetUserFollowers(u2.Username)
 
 						So(err, ShouldBeNil)
 
@@ -261,22 +220,22 @@ func (bs *BddTestSuite) TestRelationships_Create() {
 
 func (bs *BddTestSuite) TestRelationships_Remove() {
 	Convey("Given two users U1 and U1", bs.T(), func() {
-		u1 := duplicateUser(bs.svc, *bs.user, "newU1")
-		u2 := duplicateUser(bs.svc, *bs.user, "newU2")
+		u1 := DuplicateUser(bs.svc.users, *bs.user, "newU1")
+		u2 := DuplicateUser(bs.svc.users, *bs.user, "newU2")
 
 		Convey("With U1 following U2", func() {
 			u1.Follow(u2)
 			So(u1.IsFollowing(u2), ShouldBeTrue)
 
 			Convey("When U1 unfollows u2", func() {
-				err := bs.svc.RemoveRelationshipFor(u1.ID, u2.username)
+				err := bs.svc.RemoveRelationshipFor(u1.ID, u2.Username)
 				So(err, ShouldBeNil)
 
 				Convey("Then U1 is not following U2", func() {
 					So(u1.IsFollowing(u2), ShouldBeFalse)
 
 					Convey("And U2 is not in U1's friends list", func() {
-						friends, err := bs.svc.GetUserFriends(u1.username)
+						friends, err := bs.svc.GetUserFriends(u1.Username)
 
 						So(err, ShouldBeNil)
 
@@ -284,7 +243,7 @@ func (bs *BddTestSuite) TestRelationships_Remove() {
 						So(userInfo, ShouldResemble, UserInfo{})
 
 						Convey("And U1 is not in U2's follower's list", func() {
-							followers, err := bs.svc.GetUserFollowers(u2.username)
+							followers, err := bs.svc.GetUserFollowers(u2.Username)
 
 							So(err, ShouldBeNil)
 
@@ -305,9 +264,9 @@ func (bs *BddTestSuite) TestRelationships_Remove() {
 
 func (bs *BddTestSuite) TestTimelines() {
 	Convey("Given user U1 following U2 and U3 ", bs.T(), func() {
-		u1 := duplicateUser(bs.svc, *bs.user, "uu1")
-		u2 := duplicateUser(bs.svc, *bs.user, "uu2")
-		u3 := duplicateUser(bs.svc, *bs.user, "uu3")
+		u1 := DuplicateUser(bs.svc.users, *bs.user, "uu1")
+		u2 := DuplicateUser(bs.svc.users, *bs.user, "uu2")
+		u3 := DuplicateUser(bs.svc.users, *bs.user, "uu3")
 
 		u1.Follow(u2)
 		u1.Follow(u3)
@@ -325,7 +284,7 @@ func (bs *BddTestSuite) TestTimelines() {
 				So(err, ShouldBeNil)
 
 				Convey("Then his timeline is as follows", func() {
-					ar := authorResponse{u1.ID, u1.username, avatar(u1.email)}
+					ar := authorResponse{u1.ID, u1.Username, avatar(u1.Email)}
 					expectedTL := []postResponse{
 						{p12ID, posts[4], tl[0].Timestamp, ar},
 						{p32ID, posts[3], tl[1].Timestamp, ar},
@@ -349,13 +308,13 @@ func (bs *BddTestSuite) TestTimelines() {
 	})
 }
 
-func createInfoFromUser(u2 *user) UserInfo {
+func createInfoFromUser(u2 *User) UserInfo {
 	return UserInfo{
 		ID:       u2.ID,
-		Username: u2.username,
-		Avatar:   avatar(u2.email),
-		Bio:      u2.bio,
-		Joined:   u2.createdAt,
+		Username: u2.Username,
+		Avatar:   avatar(u2.Email),
+		Bio:      u2.Bio,
+		Joined:   u2.CreatedAt,
 	}
 }
 

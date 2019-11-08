@@ -1,7 +1,6 @@
-package gomicroblog
+package blog
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -11,10 +10,10 @@ import (
 
 type ServiceTestSuite struct {
 	suite.Suite
-	svc    service
-	req    registerUserRequest
-	userID ID
-	user   *user
+	svc             service
+	username, email string
+	userID          ID
+	user            *User
 }
 
 func (ts *ServiceTestSuite) TearDownTest() {
@@ -23,69 +22,35 @@ func (ts *ServiceTestSuite) TearDownTest() {
 
 func (ts *ServiceTestSuite) SetupSuite() {
 	ts.svc = service{users: NewUserRepository(), posts: NewPostRepository()}
-	ts.req = registerUserRequest{"username", "password", "a@b"}
+	ts.userID = nextID()
+	ts.username = "username"
+	ts.email = "a@b.con"
+	ts.svc.CreateProfile(string(ts.userID), ts.username, ts.email)
 
-	id, _ := ts.svc.RegisterNewUser(ts.req)
-	ts.userID = id
-
-	user, _ := ts.svc.users.FindByID(id)
-	ts.user = user
+	u, _ := ts.svc.users.FindByID(ts.userID)
+	ts.user = u
 }
 
-func (ts *ServiceTestSuite) TestService_RegisterNewUser() {
+func (ts *ServiceTestSuite) TestService_CreateProfile() {
+	id := nextID()
 	now := time.Now().UTC()
-
 	tests := []struct {
-		description                string
-		req                        *registerUserRequest
-		wantValidID, wantCreatedAt bool
-		wantLastSeen               bool
-		wantErr                    error
+		username, email string
+		wantCreatedAt   bool
 	}{
-		{description: "ExistingUsername", req: &registerUserRequest{"username", "password1", "b@c"}, wantErr: ErrExistingUsername},
-		{description: "ExistingEmail", req: &registerUserRequest{"username2", "password1", "a@b"}, wantErr: ErrExistingEmail},
-		{description: "InvalidPassword", req: &registerUserRequest{"username2", "passwod", "b@c"}, wantErr: ErrInvalidPassword},
-		{description: "ValidCredentials", req: &registerUserRequest{"username2", "password", "b@c.com"}, wantValidID: true, wantCreatedAt: true, wantLastSeen: true, wantErr: nil},
+		{username: ts.username},
+		{username: "new", email: ts.email},
+		{username: "new", email: "n@e.co", wantCreatedAt: true},
 	}
 
 	for _, tt := range tests {
-		ts.Run(fmt.Sprintf("%s", tt.description), func() {
-			userID, err := ts.svc.RegisterNewUser(*tt.req)
+		ts.svc.CreateProfile(string(id), tt.username, tt.email)
 
-			assert.Equal(ts.T(), tt.wantErr, err)
-			assert.Equal(ts.T(), IsValidID(string(userID)), tt.wantValidID)
+		user, _ := ts.svc.users.FindByID(id)
 
-			user, _ := ts.svc.users.FindByID(userID)
-			if user != nil {
-				assert.Equal(ts.T(), tt.wantCreatedAt, user.createdAt.After(now))
-				assert.Equal(ts.T(), tt.wantLastSeen, user.lastSeen.After(now))
-				assert.True(ts.T(), checkPasswordHash(user.password, "password"))
-			}
-		})
-	}
-}
-
-func (ts ServiceTestSuite) TestService_ValidateUser() {
-
-	tests := []struct {
-		username, password string
-		wantErr            error
-		wantValidID        bool
-	}{
-		{"", "", ErrInvalidCredentials, false},
-		{"user", "jaiu", ErrInvalidCredentials, false},
-		{"nonexistent", "password", ErrInvalidCredentials, false},
-		{"username", "incorrect", ErrInvalidCredentials, false},
-		{"username", "password", nil, true},
-	}
-
-	for _, tt := range tests {
-		req := validateUserRequest{tt.username, tt.password}
-
-		userID, err := ts.svc.ValidateUser(req)
-
-		assert.Equal(ts.T(), tt.wantErr, err)
-		assert.Equal(ts.T(), tt.wantValidID, IsValidID(string(userID)))
+		if user != nil {
+			assert.Equal(ts.T(), tt.wantCreatedAt, user.CreatedAt.After(now))
+		}
 	}
 }
 
@@ -129,7 +94,7 @@ func (ts *ServiceTestSuite) TestService_GetUserPosts() {
 	}{
 		{wantErr: ErrInvalidUsername},
 		{username: "void", wantErr: ErrNotFound},
-		{username: ts.req.Username, wantErr: nil, wantPostsLen: 1},
+		{username: ts.username, wantErr: nil, wantPostsLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -140,8 +105,8 @@ func (ts *ServiceTestSuite) TestService_GetUserPosts() {
 }
 
 func (ts *ServiceTestSuite) TestService_GetProfile() {
-	av := avatar(ts.req.Email)
-	u := ts.req.Username
+	av := avatar(ts.email)
+	u := ts.username
 
 	tests := []struct {
 		username           string
@@ -163,8 +128,8 @@ func (ts *ServiceTestSuite) TestService_GetProfile() {
 		assert.Equal(ts.T(), tt.wantID, p.ID)
 
 		if tt.wantErr == nil {
-			assert.Equal(ts.T(), ts.user.createdAt, p.Joined)
-			assert.Equal(ts.T(), ts.user.lastSeen, p.LastSeen)
+			assert.Equal(ts.T(), ts.user.CreatedAt, p.Joined)
+			assert.Equal(ts.T(), ts.user.LastSeen, p.LastSeen)
 		}
 	}
 }
@@ -185,7 +150,7 @@ func (ts *ServiceTestSuite) TestService_UpdateLastSeen() {
 		assert.Equal(ts.T(), tt.wantErr, err)
 
 		if tt.wantLS {
-			assert.Equal(ts.T(), tt.wantLS, ts.user.lastSeen.After(now))
+			assert.Equal(ts.T(), tt.wantLS, ts.user.LastSeen.After(now))
 		}
 	}
 }
@@ -195,8 +160,8 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 	tempUser := *ts.user
 	tempUser.ID = nextID()
 	origUN := "newUsername"
-	tempUser.username = origUN
-	bio := tempUser.bio
+	tempUser.Username = origUN
+	bio := tempUser.Bio
 	err := ts.svc.users.Store(&tempUser)
 	assert.Nil(ts.T(), err)
 
@@ -219,7 +184,7 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 		{req: emptyUsernameReq, wantErr: ErrInvalidID},
 		{id: nextID(), req: emptyUsernameReq, wantErr: ErrNotFound},
 		{id: tempUser.ID, req: emptyUsernameReq, wantErr: ErrInvalidUsername},
-		{id: tempUser.ID, req: editProfileRequest{Username: &ts.req.Username}, wantErr: ErrExistingUsername},
+		{id: tempUser.ID, req: editProfileRequest{Username: &ts.username}, wantErr: ErrExistingUsername},
 		{id: tempUser.ID, req: editProfileRequest{Username: &origUN}, wantErr: nil, wantUN: origUN},
 		{id: tempUser.ID, req: editProfileRequest{Username: &u}, wantErr: nil, wantUN: u, wantBio: bio},
 		{id: tempUser.ID, req: editProfileRequest{Bio: &longBio}, wantErr: ErrBioTooLong, wantBio: bio, wantUN: origUN},
@@ -233,21 +198,21 @@ func (ts *ServiceTestSuite) TestEditProfile() {
 		assert.Equal(ts.T(), tt.wantErr, err)
 
 		if err == nil {
-			assert.Equal(ts.T(), tt.wantUN, tempUser.username)
-			assert.Equal(ts.T(), tt.wantBio, tempUser.bio)
+			assert.Equal(ts.T(), tt.wantUN, tempUser.Username)
+			assert.Equal(ts.T(), tt.wantBio, tempUser.Bio)
 		}
 
 		// reset
-		tempUser.username = origUN
-		tempUser.bio = bio
+		tempUser.Username = origUN
+		tempUser.Bio = bio
 	}
 
 	_ = ts.svc.users.Delete(tempUser.ID)
 }
 
 func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
-	u1 := duplicateUser(ts.svc, *ts.user, "user1")
-	u2 := duplicateUser(ts.svc, *ts.user, "user2")
+	u1 := DuplicateUser(ts.svc.users, *ts.user, "user1")
+	u2 := DuplicateUser(ts.svc.users, *ts.user, "user2")
 
 	tests := []struct {
 		id         ID
@@ -259,9 +224,9 @@ func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
 		{id: "invalid", wantErr: ErrInvalidID},
 		{id: nextID(), wantErr: ErrInvalidUsername},
 		{id: nextID(), username: "nonexistent", wantErr: ErrNotFound},
-		{id: u1.ID, username: u1.username, wantErr: ErrCantFollowSelf},
-		{id: u1.ID, username: u2.username, wantErr: nil, wantFollow: true, wantLen: 1},
-		{id: u1.ID, username: u2.username, wantErr: ErrAlreadyFollowing, wantFollow: true, wantLen: 1},
+		{id: u1.ID, username: u1.Username, wantErr: ErrCantFollowSelf},
+		{id: u1.ID, username: u2.Username, wantErr: nil, wantFollow: true, wantLen: 1},
+		{id: u1.ID, username: u2.Username, wantErr: ErrAlreadyFollowing, wantFollow: true, wantLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -279,8 +244,8 @@ func (ts *ServiceTestSuite) TestCreateRelationshipFor() {
 }
 
 func (ts *ServiceTestSuite) TestRemoveRelationshipFor() {
-	u2 := duplicateUser(ts.svc, *ts.user, "abc")
-	u1 := duplicateUser(ts.svc, *ts.user, "xyz")
+	u2 := DuplicateUser(ts.svc.users, *ts.user, "abc")
+	u1 := DuplicateUser(ts.svc.users, *ts.user, "xyz")
 	u1.Follow(u2)
 
 	tests := []struct {
@@ -293,9 +258,9 @@ func (ts *ServiceTestSuite) TestRemoveRelationshipFor() {
 		{id: "invalid", wantErr: ErrInvalidID},
 		{id: nextID(), wantErr: ErrInvalidUsername},
 		{id: nextID(), username: "nonexistent", wantErr: ErrNotFound},
-		{id: u1.ID, username: u1.username, wantErr: ErrCantUnFollowSelf},
-		{id: u1.ID, username: u2.username, wantErr: nil},
-		{id: u1.ID, username: u2.username, wantErr: ErrNotFollowing},
+		{id: u1.ID, username: u1.Username, wantErr: ErrCantUnFollowSelf},
+		{id: u1.ID, username: u2.Username, wantErr: nil},
+		{id: u1.ID, username: u2.Username, wantErr: ErrNotFollowing},
 	}
 
 	for _, tt := range tests {
@@ -316,8 +281,8 @@ func (ts *ServiceTestSuite) TestRemoveRelationshipFor() {
 }
 
 func (ts *ServiceTestSuite) TestRelationships() {
-	u1 := duplicateUser(ts.svc, *ts.user, "u1")
-	u2 := duplicateUser(ts.svc, *ts.user, "u2")
+	u1 := DuplicateUser(ts.svc.users, *ts.user, "u1")
+	u2 := DuplicateUser(ts.svc.users, *ts.user, "u2")
 	u1.Follow(u2)
 
 	tests := []struct {
@@ -328,9 +293,9 @@ func (ts *ServiceTestSuite) TestRelationships() {
 	}{
 		{wantErr: ErrInvalidUsername},
 		{username: "nonexistent", wantErr: ErrNotFound},
-		{username: ts.req.Username, wantErr: nil},
-		{username: u1.username, wantErr: nil, wantFriendsCount: 1},
-		{username: u2.username, wantErr: nil, wantFollowersCount: 1},
+		{username: ts.username, wantErr: nil},
+		{username: u1.Username, wantErr: nil, wantFriendsCount: 1},
+		{username: u2.Username, wantErr: nil, wantFollowersCount: 1},
 	}
 
 	for _, tt := range tests {
@@ -348,11 +313,11 @@ func (ts *ServiceTestSuite) TestRelationships() {
 }
 
 func (ts *ServiceTestSuite) TestGetTimeline() {
-	u1 := duplicateUser(ts.svc, *ts.user, "a1")
-	u2 := duplicateUser(ts.svc, *ts.user, "a2")
-	u3 := duplicateUser(ts.svc, *ts.user, "a3")
-	u4 := duplicateUser(ts.svc, *ts.user, "a4")
-	u5 := duplicateUser(ts.svc, *ts.user, "a5")
+	u1 := DuplicateUser(ts.svc.users, *ts.user, "a1")
+	u2 := DuplicateUser(ts.svc.users, *ts.user, "a2")
+	u3 := DuplicateUser(ts.svc.users, *ts.user, "a3")
+	u4 := DuplicateUser(ts.svc.users, *ts.user, "a4")
+	u5 := DuplicateUser(ts.svc.users, *ts.user, "a5")
 
 	u1.Follow(u2)
 	u1.Follow(u3)

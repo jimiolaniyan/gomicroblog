@@ -1,13 +1,10 @@
-package gomicroblog
+package blog
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +12,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jimiolaniyan/gomicroblog/auth"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -32,7 +31,9 @@ type HandlerTestSuite struct {
 	suite.Suite
 	userID      ID
 	svc         Service
-	req         registerUserRequest
+	username    string
+	user        *User
+	users       Repository
 	containerID string
 	client      *mongo.Client
 }
@@ -71,10 +72,18 @@ func (hs *HandlerTestSuite) SetupSuite() {
 		posts = NewPostRepository()
 	}
 
+	hs.users = users
 	hs.svc = NewService(users, posts)
-	hs.req = registerUserRequest{"user", "password", "a@b.com"}
-	id, _ := hs.svc.RegisterNewUser(hs.req)
+
+	id := nextID()
+	username := "user"
+	hs.svc.CreateProfile(string(id), username, "a@b.con")
+
+	hs.username = username
 	hs.userID = id
+
+	u, _ := users.FindByID(id)
+	hs.user = u
 }
 
 func (hs *HandlerTestSuite) TearDownSuite() {
@@ -86,119 +95,27 @@ func (hs *HandlerTestSuite) TearDownSuite() {
 	}
 }
 
-var nilErr = errors.New("")
+var errNil = errors.New("")
 
-func (hs *HandlerTestSuite) TestDecodeRequest() {
-	registerReq := `{ "username": "jimi", "password": "password1", "email": "test@tester.test" }`
-	loginReq := `{"username": "jimi", "password": "password1"}`
-	createPostReq := `{"body": "a simple post"}`
-	u := "new"
-	tests := []struct {
-		r       string
-		decoder func(closer io.ReadCloser) (interface{}, error)
-		wantErr error
-		wantReq interface{}
-	}{
-		{registerReq, decodeRegisterUserRequest, nil, registerUserRequest{"jimi", "password1", "test@tester.test"}},
-		{loginReq, decodeValidateUserRequest, nil, validateUserRequest{"jimi", "password1"}},
-		{createPostReq, decodeCreatePostRequest, nil, createPostRequest{"a simple post"}},
-		{`{}`, decodeEditProfileRequest, nil, editProfileRequest{nil, nil}},
-		{`{"username": "", "bio": ""}`, decodeEditProfileRequest, nil, editProfileRequest{new(string), new(string)}},
-		{`{"username": "new", "bio": "new"}`, decodeEditProfileRequest, nil, editProfileRequest{&u, &u}},
+func (hs *HandlerTestSuite) TestAccountCreatedHandler() {
+	req := `{"username": "u", "email": "e@m.com", "password": "password"}`
+	r, _ := http.NewRequest(http.MethodPost, "/auth/v1/accounts", strings.NewReader(req))
+
+	w := httptest.NewRecorder()
+	handler := http.NewServeMux()
+	svc := auth.NewService(auth.NewAccountRepository(), NewAccountCreatedHandler(hs.svc))
+	handler.Handle("/auth/v1/accounts", auth.RegisterAccountHandler(svc))
+	handler.ServeHTTP(w, r)
+
+	var res struct {
+		ID ID `json:"id"`
 	}
 
-	for _, tt := range tests {
-		body := ioutil.NopCloser(strings.NewReader(tt.r))
-		req, err := tt.decoder(body)
-		assert.Equal(hs.T(), tt.wantErr, err)
-		assert.Equal(hs.T(), tt.wantReq, req)
-	}
-}
+	_ = json.NewDecoder(w.Body).Decode(&res)
 
-func (hs *HandlerTestSuite) TestRegisterNewUserHandler() {
-	invalidUsernameReq := `{"username": "", "password": "pass"}`
-	invalidPassReq := `{"username": "username", "password": "pass", "email": "a@b.com"}`
-	invalidEmailReq := `{"username": "username", "password": "password", "email": "ab.com"}`
-	registerReq := `{"username":"jimi", "password":"password1", "email":"test@tester.test"}`
-	existingUserReq := `{"username": "jimi", "password": "password", "email": "a@b.com"}`
-	existingEmailReq := `{"username": "username", "password": "password", "email": "test@tester.test"}`
-
-	tests := []struct {
-		req          string
-		wantCode     int
-		wantID       bool
-		wantErr      error
-		wantLocation string
-	}{
-		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: nilErr},
-		{req: invalidUsernameReq, wantCode: http.StatusUnprocessableEntity, wantErr: ErrInvalidUsername},
-		{req: invalidPassReq, wantCode: http.StatusUnprocessableEntity, wantErr: ErrInvalidPassword},
-		{req: invalidEmailReq, wantCode: http.StatusUnprocessableEntity, wantErr: ErrInvalidEmail},
-		{req: registerReq, wantCode: http.StatusCreated, wantID: true, wantErr: nilErr, wantLocation: "/v1/users"},
-		{req: existingUserReq, wantCode: http.StatusConflict, wantErr: ErrExistingUsername},
-		{req: existingEmailReq, wantCode: http.StatusConflict, wantErr: ErrExistingEmail},
-	}
-
-	for _, tt := range tests {
-		r, _ := http.NewRequest(http.MethodPost, "/v1/users", strings.NewReader(tt.req))
-
-		w := httptest.NewRecorder()
-		handler := http.NewServeMux()
-		handler.Handle("/v1/users", RegisterUserHandler(hs.svc))
-		handler.ServeHTTP(w, r)
-
-		var res struct {
-			ID  ID     `json:"id,omitempty"`
-			Err string `json:"error,omitempty"`
-		}
-
-		_ = json.NewDecoder(w.Body).Decode(&res)
-		assert.Equal(hs.T(), tt.wantCode, w.Code)
-		assert.Equal(hs.T(), tt.wantErr.Error(), res.Err)
-		assert.Equal(hs.T(), IsValidID(string(res.ID)), tt.wantID)
-		assert.Equal(hs.T(), w.Header().Get("Content-Type"), "application/json")
-		assert.True(hs.T(), strings.HasPrefix(w.Header().Get("Location"), tt.wantLocation))
-	}
-}
-
-func (hs *HandlerTestSuite) TestLoginHandler() {
-	validClaims := fmt.Sprintf("{\"iss\":\"auth\",\"sub\":\"%s\"}", hs.userID)
-	tests := []struct {
-		req                    string
-		wantCode, wantTokenLen int
-		wantClaims             string
-	}{
-		{req: `invalid request`, wantCode: http.StatusBadRequest, wantTokenLen: 1},
-		{req: `{"username": "nonexistent", "password": "password"}`, wantCode: http.StatusUnauthorized, wantTokenLen: 1},
-		{req: `{"username": "user", "password": "anInvalid"}`, wantCode: http.StatusUnauthorized, wantTokenLen: 1},
-		{req: `{"username": "user", "password": "password"}`, wantCode: http.StatusOK, wantTokenLen: 3, wantClaims: validClaims},
-	}
-
-	for _, tt := range tests {
-		req, err := http.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(tt.req))
-		assert.Nil(hs.T(), err)
-
-		w := httptest.NewRecorder()
-		mux := http.NewServeMux()
-		mux.Handle("/v1/sessions", LoginHandler(hs.svc))
-		mux.ServeHTTP(w, req)
-
-		var res struct {
-			Token string `json:"token,omitempty"`
-			Error string `json:"error,omitempty"`
-		}
-
-		_ = json.NewDecoder(w.Body).Decode(&res)
-		assert.Equal(hs.T(), tt.wantCode, w.Code)
-		parts := strings.Split(res.Token, ".")
-		assert.Equal(hs.T(), len(parts), tt.wantTokenLen)
-
-		if len(parts) > 2 {
-			claim, err := base64.RawStdEncoding.DecodeString(parts[1])
-			assert.Nil(hs.T(), err)
-			assert.Equal(hs.T(), tt.wantClaims, string(claim))
-		}
-	}
+	u, _ := hs.users.FindByID(res.ID)
+	assert.NotNil(hs.T(), u)
+	assert.Equal(hs.T(), u.ID, res.ID)
 }
 
 func (hs *HandlerTestSuite) TestCreatePostHandler() {
@@ -213,12 +130,12 @@ func (hs *HandlerTestSuite) TestCreatePostHandler() {
 		wantID, withCtx bool
 		wantLoc         string
 	}{
-		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: nilErr, withCtx: true},
+		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: errNil, withCtx: true},
 		{req: `{}`, wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{req: b, wantCode: http.StatusUnauthorized, wantErr: ErrInvalidID, withCtx: true},
 		{req: b, userID: "puoiwoerigp", wantCode: http.StatusUnauthorized, wantErr: ErrInvalidID, withCtx: true},
 		{req: b, userID: uid, wantCode: http.StatusUnprocessableEntity, wantErr: ErrEmptyBody, withCtx: true},
-		{req: body, userID: uid, wantCode: http.StatusCreated, wantErr: nilErr, wantID: true, wantLoc: "/v1/posts/", withCtx: true},
+		{req: body, userID: uid, wantCode: http.StatusCreated, wantErr: errNil, wantID: true, wantLoc: "/v1/posts/", withCtx: true},
 	}
 
 	for _, tt := range tests {
@@ -254,9 +171,9 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 	host := "http://localhost:8080"
 	finalURL := fmt.Sprintf("%s/v1/users/%s", host, u)
 
-	id, _ := hs.svc.RegisterNewUser(registerUserRequest{"postu", "password", "e@mma.com"})
+	user := DuplicateUser(hs.users, *hs.user, u)
 	_, _ = hs.svc.CreatePost(hs.userID, "post")
-	_, _ = hs.svc.CreatePost(id, "post")
+	_, _ = hs.svc.CreatePost(user.ID, "post")
 
 	tests := []struct {
 		username              string
@@ -266,9 +183,9 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 		wantUsername, wantURL string
 		wantPosLen            int
 	}{
-		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr, wantUsername: ""},
+		{username: "  ", wantCode: http.StatusBadRequest, wantErr: errNil, wantUsername: ""},
 		{username: "nonexistent", wantCode: http.StatusNotFound, wantErr: ErrNotFound, wantUsername: ""},
-		{username: u, wantCode: http.StatusOK, wantErr: nilErr, wantID: true, wantUsername: u, wantURL: finalURL, wantPosLen: 1},
+		{username: u, wantCode: http.StatusOK, wantErr: errNil, wantID: true, wantUsername: u, wantURL: finalURL, wantPosLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -300,10 +217,10 @@ func (hs *HandlerTestSuite) TestGetProfileHandler() {
 }
 
 func (hs *HandlerTestSuite) TestEditProfileHandler() {
-	// register new user to avoid conflicts with user in the suite
-	req := registerUserRequest{"tempUser", "password", "temp@mail.com"}
-	id, _ := hs.svc.RegisterNewUser(req)
-	sid := string(id)
+	// duplicate user to avoid conflicts with user in the suite
+	username := "tempUser"
+	user := DuplicateUser(hs.users, *hs.user, username)
+	sid := string(user.ID)
 
 	longBio := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut " +
 		"labore et dolore magna aliqua. Ut enim ad minim h"
@@ -318,24 +235,24 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 		wantErr               error
 		wantUsername, wantBio string
 	}{
-		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{req: `invalid request`, wantCode: http.StatusBadRequest, wantErr: errNil},
 		{req: `{}`, wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{req: `{}`, id: "invalid", wantCode: http.StatusUnauthorized, withCtx: true, wantErr: ErrInvalidID},
-		{req: `{}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr},
+		{req: `{}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
 		{req: `{"username": ""}`, id: sid, wantCode: S422, withCtx: true, wantErr: ErrInvalidUsername},
-		{req: fmt.Sprintf(`{"username": "%s"}`, req.Username), id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr},
-		{req: fmt.Sprintf(`{"username": "%s"}`, hs.req.Username), id: sid, wantCode: http.StatusConflict, withCtx: true, wantErr: ErrExistingUsername},
-		{req: `{"username": "newName"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr, wantUsername: "newName", reset: true},
-		{req: `{"bio": ""}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr},
+		{req: fmt.Sprintf(`{"username": "%s"}`, username), id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
+		{req: fmt.Sprintf(`{"username": "%s"}`, hs.username), id: sid, wantCode: http.StatusConflict, withCtx: true, wantErr: ErrExistingUsername},
+		{req: `{"username": "newName"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil, wantUsername: "newName", reset: true},
+		{req: `{"bio": ""}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil},
 		{req: fmt.Sprintf(`{"bio": "%s"}`, longBio), id: sid, wantCode: S422, withCtx: true, wantErr: ErrBioTooLong},
-		{req: `{"bio": "Bios"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr, wantBio: "Bios"},
-		{req: `{"username": "newU", "bio": "Be nice"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: nilErr, wantBio: "Be nice", wantUsername: "newU"},
+		{req: `{"bio": "Bios"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil, wantBio: "Bios"},
+		{req: `{"username": "newU", "bio": "Be nice"}`, id: sid, wantCode: http.StatusOK, withCtx: true, wantErr: errNil, wantBio: "Be nice", wantUsername: "newU"},
 	}
 
 	for _, tt := range tests {
 		r, _ := http.NewRequest(http.MethodPatch, "/v1/users", strings.NewReader(tt.req))
 
-		u := req.Username
+		u := username
 		if len(tt.wantUsername) > 0 {
 			u = tt.wantUsername
 		}
@@ -374,12 +291,12 @@ func (hs *HandlerTestSuite) TestEditProfileHandler() {
 		if len(tt.wantUsername) > 0 {
 			assert.Equal(hs.T(), tt.wantUsername, res2.Profile.Username)
 		} else {
-			assert.Equal(hs.T(), req.Username, res2.Profile.Username)
+			assert.Equal(hs.T(), username, res2.Profile.Username)
 		}
 
 		//reset the username and bio
 		if tt.reset {
-			body := strings.NewReader(fmt.Sprintf(`{"username": "%s", "bio": ""}`, req.Username))
+			body := strings.NewReader(fmt.Sprintf(`{"username": "%s", "bio": ""}`, username))
 			r3, _ := http.NewRequest(http.MethodPatch, "/v1/users", body)
 			r3 = r3.WithContext(context.WithValue(r3.Context(), idKey, tt.id))
 			router.ServeHTTP(w, r3)
@@ -391,8 +308,7 @@ func (hs *HandlerTestSuite) TestCreateRelationshipHandler() {
 	uid := string(hs.userID)
 
 	u := "followUser"
-	_, err := hs.svc.RegisterNewUser(registerUserRequest{u, "password", "f@u.co"})
-	assert.Nil(hs.T(), err)
+	DuplicateUser(hs.users, *hs.user, u)
 
 	tests := []struct {
 		username string
@@ -400,11 +316,11 @@ func (hs *HandlerTestSuite) TestCreateRelationshipHandler() {
 		wantCode int
 		wantErr  error
 	}{
-		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{username: "  ", wantCode: http.StatusBadRequest, wantErr: errNil},
 		{username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
-		{username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantFollowSelf},
-		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: nilErr},
+		{username: hs.username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantFollowSelf},
+		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: errNil},
 		{username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrAlreadyFollowing},
 	}
 
@@ -440,7 +356,7 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 	uid := string(hs.userID)
 
 	u := "unFollowUser"
-	_, _ = hs.svc.RegisterNewUser(registerUserRequest{u, "password", "u@u.co"})
+	DuplicateUser(hs.users, *hs.user, u)
 	_ = hs.svc.CreateRelationshipFor(ID(uid), u)
 
 	tests := []struct {
@@ -449,11 +365,11 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 		wantCode int
 		wantErr  error
 	}{
-		{username: "  ", wantCode: http.StatusBadRequest, wantErr: nilErr},
+		{username: "  ", wantCode: http.StatusBadRequest, wantErr: errNil},
 		{username: "nonexistent", wantCode: http.StatusInternalServerError, wantErr: ErrEmptyContext},
 		{username: "nonexistent", withCtx: true, wantCode: http.StatusNotFound, wantErr: ErrNotFound},
-		{username: hs.req.Username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantUnFollowSelf},
-		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: nilErr},
+		{username: hs.username, withCtx: true, wantCode: http.StatusForbidden, wantErr: ErrCantUnFollowSelf},
+		{username: u, withCtx: true, wantCode: http.StatusNoContent, wantErr: errNil},
 		{username: u, withCtx: true, wantCode: http.StatusConflict, wantErr: ErrNotFollowing},
 	}
 
@@ -483,8 +399,8 @@ func (hs *HandlerTestSuite) TestRemoveRelationshipHandler() {
 
 func (hs *HandlerTestSuite) TestGetRelationships() {
 	u := "follower"
-	id, _ := hs.svc.RegisterNewUser(registerUserRequest{u, "password", "usf@uf.co"})
-	_ = hs.svc.CreateRelationshipFor(id, hs.req.Username)
+	user := DuplicateUser(hs.users, *hs.user, u)
+	_ = hs.svc.CreateRelationshipFor(user.ID, hs.username)
 	_ = hs.svc.CreateRelationshipFor(hs.userID, u)
 
 	tests := []struct {
@@ -494,7 +410,7 @@ func (hs *HandlerTestSuite) TestGetRelationships() {
 
 		{username: "  ", wantCode: http.StatusBadRequest},
 		{username: "nonexistent", wantCode: http.StatusNotFound},
-		{username: hs.req.Username, wantCode: http.StatusOK, wantFLen: 1},
+		{username: hs.username, wantCode: http.StatusOK, wantFLen: 1},
 	}
 
 	for _, tt := range tests {
@@ -611,7 +527,7 @@ func (hs *HandlerTestSuite) TestLastSeenMiddleware() {
 		assert.Equal(hs.T(), tt.wantCalled, called)
 
 		if tt.wantUpdatedLastSeen {
-			p, _ := hs.svc.GetProfile(hs.req.Username)
+			p, _ := hs.svc.GetProfile(hs.username)
 			assert.Equal(hs.T(), tt.wantUpdatedLastSeen, p.LastSeen.After(now))
 		}
 	}

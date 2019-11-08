@@ -1,4 +1,4 @@
-package gomicroblog
+package blog
 
 import (
 	"errors"
@@ -11,10 +11,10 @@ var (
 )
 
 type PostRepository interface {
-	FindByID(id PostID) (post, error)
-	Store(post post) error
-	FindLatestPostsForUser(id ID) ([]*post, error)
-	FindLatestPostsForUserAndFriends(user *user) ([]*post, error)
+	FindByID(id PostID) (Post, error)
+	Store(post Post) error
+	FindLatestPostsForUser(id ID) ([]*Post, error)
+	FindLatestPostsForUserAndFriends(user *User) ([]*Post, error)
 }
 
 type PostID string
@@ -23,18 +23,17 @@ type Author struct {
 	UserID ID `bson:"user_id"`
 }
 
-type post struct {
+type Post struct {
 	ID        PostID `bson:"_id"`
 	Author    Author
 	Body      string
 	Timestamp time.Time
 }
 
-// TODO check that author id and name are properly set
-func NewPost(author Author, body string) (*post, error) {
+func NewPost(author Author, body string) (*Post, error) {
 	if body == "" {
 		return nil, ErrEmptyBody
 	}
 
-	return &post{Author: author, Body: body, Timestamp: time.Now()}, nil
+	return &Post{Author: author, Body: body, Timestamp: time.Now()}, nil
 }

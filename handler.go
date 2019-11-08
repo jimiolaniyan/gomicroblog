@@ -1,4 +1,4 @@
-package gomicroblog
+package blog
 
 import (
 	"context"
@@ -21,49 +21,6 @@ const idKey = key("auth")
 
 var signingKey = []byte(os.Getenv("AUTH_SIGNING_KEY"))
 
-func RegisterUserHandler(svc Service) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, err := decodeRegisterUserRequest(r.Body)
-		w.Header().Set("Content-Type", "application/json")
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		id, err := svc.RegisterNewUser(req.(registerUserRequest))
-		if err != nil {
-			encodeError(err, w)
-			return
-		}
-		location := strings.Join(strings.Split(r.URL.Path, "/")[0:3], "/")
-		w.Header().Set("Location", fmt.Sprintf("%s/%s", location, id))
-		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(&registerUserResponse{ID: id}); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-	})
-}
-
-func LoginHandler(svc Service) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req, err := decodeValidateUserRequest(r.Body)
-		w.Header().Set("Content-Type", "application/json")
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		userID, err := svc.ValidateUser(req.(validateUserRequest))
-		if err != nil {
-			encodeError(err, w)
-			return
-		}
-
-		tokenString, err := getJWTToken(string(userID))
-		if err = json.NewEncoder(w).Encode(map[string]interface{}{"token": tokenString}); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-		}
-	})
-}
-
 var ErrEmptyContext = errors.New("could not get user id from context")
 
 func CreatePostHandler(svc Service) http.Handler {
@@ -82,7 +39,7 @@ func CreatePostHandler(svc Service) http.Handler {
 		}
 
 		req := request.(createPostRequest)
-		postId, err := svc.CreatePost(ID(userID), req.Body)
+		postID, err := svc.CreatePost(ID(userID), req.Body)
 
 		if err != nil {
 			encodeError(err, w)
@@ -90,9 +47,9 @@ func CreatePostHandler(svc Service) http.Handler {
 		}
 
 		location := strings.Join(strings.Split(r.URL.Path, "/")[0:3], "/")
-		w.Header().Set("Location", fmt.Sprintf("%s/%s", location, postId))
+		w.Header().Set("Location", fmt.Sprintf("%s/%s", location, postID))
 		w.WriteHeader(http.StatusCreated)
-		if err := json.NewEncoder(w).Encode(&createPostResponse{ID: postId}); err != nil {
+		if err := json.NewEncoder(w).Encode(&createPostResponse{ID: postID}); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 	})
@@ -300,15 +257,15 @@ func getJWTToken(id string) (string, error) {
 
 func encodeError(err error, w http.ResponseWriter) {
 	switch err {
-	case ErrInvalidCredentials, ErrInvalidID:
+	case ErrInvalidID:
 		w.WriteHeader(http.StatusUnauthorized)
 	case ErrCantFollowSelf, ErrCantUnFollowSelf:
 		w.WriteHeader(http.StatusForbidden)
 	case ErrNotFound:
 		w.WriteHeader(http.StatusNotFound)
-	case ErrExistingUsername, ErrExistingEmail, ErrAlreadyFollowing, ErrNotFollowing:
+	case ErrExistingUsername, ErrAlreadyFollowing, ErrNotFollowing:
 		w.WriteHeader(http.StatusConflict)
-	case ErrEmptyBody, ErrInvalidEmail, ErrInvalidPassword, ErrInvalidUsername, ErrBioTooLong:
+	case ErrEmptyBody, ErrInvalidUsername, ErrBioTooLong:
 		w.WriteHeader(http.StatusUnprocessableEntity)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
@@ -318,23 +275,6 @@ func encodeError(err error, w http.ResponseWriter) {
 	}); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-}
-
-func decodeRegisterUserRequest(body io.ReadCloser) (interface{}, error) {
-	req := registerUserRequest{}
-	if err := json.NewDecoder(body).Decode(&req); err != nil {
-		return registerUserRequest{}, err
-	}
-
-	return req, nil
-}
-
-func decodeValidateUserRequest(body io.ReadCloser) (interface{}, error) {
-	req := validateUserRequest{}
-	if err := json.NewDecoder(body).Decode(&req); err != nil {
-		return validateUserRequest{}, err
-	}
-	return req, nil
 }
 
 func decodeCreatePostRequest(body io.ReadCloser) (interface{}, error) {
